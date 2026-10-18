@@ -186,8 +186,9 @@ const MAP_AREA_LABELS = [
     const pkey = PORTRAITS && PORTRAITS[school];
     const d = findBySchool(school);
     if (!pkey) return `<i>${(d && d.mark) || school[0]}</i>`;
-    return `<img src="assets/img/school/${pkey}.webp" alt="" loading="lazy"
-      onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('.webp','.jpg');}else{this.remove();}">`;
+    // 卡片上只有 44×52，取 160px 缩略图，别再下整张立绘
+    return `<img src="assets/img/school/${pkey}-sm.webp" alt="" loading="lazy" decoding="async"
+      onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('-sm.webp','.jpg');}else{this.remove();}">`;
   }
 
   // 环绕卡：门派 / 山门 / 一句朱批，三行如图册的条目，缩略用立绘

@@ -59,6 +59,21 @@ git add -A && git commit -m "改了什么" && git push
 > 网页上传亦可：解压 `jx3-travel-site.zip`，把 `index.html`、`assets/` 拖进仓库根目录，
 > 其余目录只是开发期脚本，不影响站点运行。
 
+## 资源规格
+
+站点在国内访问 GitHub Pages 偏慢，图片按实际显示尺寸输出，不做「原图直出」：
+
+| 用途 | 文件 | 规格 |
+| --- | --- | --- |
+| 卡片实景 | `assets/img/*.webp` | 宽 ≤800，WebP q72，平均 54 KB |
+| 卡片实景兜底 | `assets/img/*.jpg` | 宽 ≤800，JPEG q66 |
+| 弹层立绘 | `assets/img/school/*.webp` | 宽 ≤620，q78 |
+| 卡片头像 | `assets/img/school/*-sm.webp` | 宽 ≤160，q76，约 11 KB |
+
+- 卡片视图首次进入才构建，实景图随之按需加载；舆图首屏只拉 20 张头像（合计约 185 KB）
+- 所有 `<img>` 带 `loading="lazy" decoding="async"`，WebP 失败时 `onerror` 回落到同名 JPG
+- 改图后重跑 `_tools/optimize-images.py` 重新压缩
+
 ## 数据说明
 
 收藏、留言、自拟行程都存在浏览器 `localStorage`（键名 `jx3.*`），不上传、他人不可见。

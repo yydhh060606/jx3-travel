@@ -114,9 +114,11 @@
   function schoolRole(name) {
     return (SCHOOLS[name] && SCHOOLS[name].role) || '';
   }
-  function schoolPortrait(name) {
+  // small=true 取 160px 缩略（卡片上只有 52px，不必下整张立绘）
+  function schoolPortrait(name, small) {
     const key = PORTRAITS && PORTRAITS[name];
-    return key ? 'assets/img/school/' + key + '.webp' : '';
+    if (!key) return '';
+    return 'assets/img/school/' + key + (small ? '-sm' : '') + '.webp';
   }
   // 图片统一走 WebP；万一某张缺失，onerror 里回落到同名 .jpg
   function toWebp(path) {
@@ -252,16 +254,16 @@
 
   function cardHTML(d) {
     const color = schoolColor(d.school);
-    const portrait = schoolPortrait(d.school);
+    const portrait = schoolPortrait(d.school, true);
     return `
       <article class="card" data-id="${d.id}" tabindex="0" role="button"
                aria-label="${escapeHTML(d.city)} · ${escapeHTML(d.school)}"
                style="--accent:${color}">
         <div class="card__media">
           <img class="card__img" src="${escapeHTML(toWebp(d.image))}" alt="${escapeHTML(d.city)}·${escapeHTML(d.school)}实景"
-               loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('.webp','.jpg');}else{this.classList.add('is-broken');this.removeAttribute('src');}">
-          ${portrait ? `<img class="card__ava" src="${portrait}" alt="${escapeHTML(d.school)}立绘" loading="lazy"
-               onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('.webp','.jpg');}else{this.remove();}">` : ''}
+               loading="lazy" decoding="async" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('.webp','.jpg');}else{this.classList.add('is-broken');this.removeAttribute('src');}">
+          ${portrait ? `<img class="card__ava" src="${portrait}" alt="${escapeHTML(d.school)}立绘" loading="lazy" decoding="async"
+               onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('-sm.webp','.jpg');}else{this.remove();}">` : ''}
           <span class="card__school">${escapeHTML(d.school)}</span>
           <span class="card__role">${escapeHTML(schoolRole(d.school))}</span>
           ${markHTML(d.id)}
@@ -822,7 +824,7 @@
       <button class="modal__close" data-close aria-label="关闭">×</button>
       <div class="m-portrait" aria-hidden="false">
         ${portrait
-          ? `<img src="${portrait}" alt="${escapeHTML(d.school)}立绘" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('.webp','.jpg');}else{this.parentElement.classList.add('is-none');this.remove();}">`
+          ? `<img src="${portrait}" alt="${escapeHTML(d.school)}立绘" decoding="async" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('.webp','.jpg');}else{this.parentElement.classList.add('is-none');this.remove();}">`
           : ''}
         <span class="m-portrait__bg"></span>
         <div class="m-portrait__veil"></div>
@@ -965,11 +967,15 @@
   }
 
   /* ---------- 渲染主流程 ---------- */
+  // 卡片视图首屏并不显示，构建它会把 20 张实景图一并拉下来（display:none 也照样下载），
+  // 所以推迟到第一次切过去再建，舆图视图就只剩 20 张几 KB 的小像。
+  let cardsBuilt = false;
   function render() {
     const list = filtered();
     const grid = $('#grid');
     const empty = $('#empty');
     grid.innerHTML = list.map(cardHTML).join('');
+    cardsBuilt = true;
     empty.hidden = list.length !== 0;
     updateCount(list.length);
 
@@ -1466,7 +1472,7 @@
     if (view === 'map') {
       if (typeof window.mapHighlight === 'function') window.mapHighlight(null, false);
     } else if (view === 'cards') {
-      render();
+      if (cardsBuilt) paintMarks(); else render();
     } else if (view === 'routes') {
       renderMaker();
       renderMine();
@@ -1544,7 +1550,7 @@
   initCmtForm();
   initStats();
   paintBoard();
-  render();
+  if (currentView === 'cards') render();   // 深链 ?view=cards 才立刻建卡片
   renderMaker();
   renderMine();
   renderCmtBoard();
