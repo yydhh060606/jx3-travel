@@ -1,0 +1,7 @@
+# 开发期对照截图（不入库）
+*.png
+!assets/**/*.png
+
+# 系统
+.DS_Store
+Thumbs.db

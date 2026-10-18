@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>江湖行纪 · 剑网三门派旅行图鉴</title>
+  <meta name="description" content="各地旅行地指南 × 剑网三门派特色：20 处真实旅行地与 20 个门派的江湖渊源。" />
+
+  <!-- 站点图标：朱砂「江」字印。SVG 为主（矢量、随系统深浅色都清晰），
+       PNG 兜底老浏览器与 iOS 主屏图标 -->
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="assets/icon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="assets/icon-180.png" />
+  <meta name="theme-color" content="#e6e0d2" />
+
+  <!-- 分享卡：微信 / X / 微博 / Slack 等抓取的第一屏。
+       上线后若要被外部平台正确解析，把 og:url 与 og:image 换成带域名的绝对地址。 -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="江湖行纪" />
+  <meta property="og:title" content="江湖行纪 · 剑网三门派旅行图鉴" />
+  <meta property="og:description" content="二十处真实山水，各系一门剑网三流派。或循天策长枪入长安，或随藏剑孤剑访西湖——把江湖走成一场旅行。" />
+  <meta property="og:image" content="assets/share-1200x630.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="江湖行纪 · 剑网三门派旅行图鉴" />
+  <meta property="og:locale" content="zh_CN" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="江湖行纪 · 剑网三门派旅行图鉴" />
+  <meta name="twitter:description" content="二十处真实山水，各系一门剑网三流派。把江湖走成一场旅行。" />
+  <meta name="twitter:image" content="assets/share-1200x630.jpg" />
+
+  <!-- 毛笔笔触字体：已按用字子集化并自托管（见 style.css 顶部 @font-face），无需外链 -->
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <!-- 天气画布：雨/雪物理粒子 -->
+  <canvas id="weather-canvas" aria-hidden="true"></canvas>
+
+  <!-- 纸底：泼墨晕染（不拦截交互，固定于视口） -->
+  <div class="ink-bed" aria-hidden="true">
+    <span class="blot blot--a"></span>
+    <span class="blot blot--b"></span>
+    <span class="blot blot--c"></span>
+    <span class="blot blot--d"></span>
+    <span class="blot blot--e"></span>
+  </div>
+
+  <!-- 复用水墨滤镜与图元 -->
+  <svg class="ink-filters" width="0" height="0" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="inkRough" x="-15%" y="-15%" width="130%" height="130%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.021 0.028" numOctaves="4" seed="13" result="t" />
+        <feDisplacementMap in="SourceGraphic" in2="t" scale="14" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="inkRoughSoft" x="-12%" y="-12%" width="124%" height="124%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.045 0.055" numOctaves="3" seed="6" result="t" />
+        <feDisplacementMap in="SourceGraphic" in2="t" scale="5" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="inkBleed"><feGaussianBlur stdDeviation="9" /></filter>
+      <filter id="inkMist"><feGaussianBlur stdDeviation="16" /></filter>
+      <!-- 狂墨：标题用，制造飞白与枯笔的不规则边缘 -->
+      <filter id="wildInk" x="-16%" y="-16%" width="132%" height="132%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.026 0.038" numOctaves="4" seed="17" result="t" />
+        <feDisplacementMap in="SourceGraphic" in2="t" scale="6.5" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <!-- 竹叶：细长尖叶 -->
+      <path id="leaf" d="M 0 0 C 24 -14, 58 -16, 84 -3 C 58 9, 24 11, 0 0 Z" />
+    </defs>
+  </svg>
+
+  <!-- 页头 -->
+  <header class="hero">
+    <div class="hero__paper" aria-hidden="true"></div>
+
+    <!-- 青绿山水：蓝灰远山 / 云雾留白 / 青绿中景 / 墨绿近坡皴擦 / 孤舟飞鸟 / 朱砂日轮 -->
+    <svg class="hero__scene" viewBox="0 0 1440 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
+      <defs>
+        <radialGradient id="gSun" cx="38%" cy="34%" r="72%">
+          <stop offset="0" stop-color="#e0663c" />
+          <stop offset=".55" stop-color="#cd4a2b" />
+          <stop offset="1" stop-color="#a8351d" />
+        </radialGradient>
+        <linearGradient id="gFar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#97b3bd" stop-opacity=".66" />
+          <stop offset="1" stop-color="#97b3bd" stop-opacity=".10" />
+        </linearGradient>
+        <linearGradient id="gMid" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4e6c65" stop-opacity=".74" />
+          <stop offset="1" stop-color="#4e6c65" stop-opacity=".15" />
+        </linearGradient>
+        <linearGradient id="gNear" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#14261f" stop-opacity=".94" />
+          <stop offset=".6" stop-color="#14261f" stop-opacity=".72" />
+          <stop offset="1" stop-color="#14261f" stop-opacity=".52" />
+        </linearGradient>
+        <linearGradient id="gWater" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#e6e0d1" stop-opacity=".58" />
+          <stop offset=".35" stop-color="#f3efe5" stop-opacity=".96" />
+          <stop offset="1" stop-color="#f3efe5" stop-opacity="1" />
+        </linearGradient>
+        <linearGradient id="gMist" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f3efe5" stop-opacity="0" />
+          <stop offset=".48" stop-color="#f3efe5" stop-opacity=".97" />
+          <stop offset="1" stop-color="#f3efe5" stop-opacity="0" />
+        </linearGradient>
+
+        <!-- ============ 夜航版：同一组山影的夜色，由 body.w-night 切换引用 ============ -->
+        <radialGradient id="gSunN" cx="40%" cy="36%" r="70%">
+          <stop offset="0" stop-color="#f4f1e2" />
+          <stop offset=".62" stop-color="#d8dfdf" />
+          <stop offset="1" stop-color="#a9b7bf" />
+        </radialGradient>
+        <linearGradient id="gFarN" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#4a5a6e" stop-opacity=".72" />
+          <stop offset="1" stop-color="#4a5a6e" stop-opacity=".08" />
+        </linearGradient>
+        <linearGradient id="gMidN" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2f3d4c" stop-opacity=".88" />
+          <stop offset="1" stop-color="#2f3d4c" stop-opacity=".16" />
+        </linearGradient>
+        <linearGradient id="gNearN" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#0a0e14" stop-opacity=".97" />
+          <stop offset=".6" stop-color="#0a0e14" stop-opacity=".82" />
+          <stop offset="1" stop-color="#0a0e14" stop-opacity=".62" />
+        </linearGradient>
+        <linearGradient id="gWaterN" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#232c37" stop-opacity=".62" />
+          <stop offset=".35" stop-color="#1b232c" stop-opacity=".96" />
+          <stop offset="1" stop-color="#171e26" stop-opacity="1" />
+        </linearGradient>
+        <linearGradient id="gMistN" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#8ea3b6" stop-opacity="0" />
+          <stop offset=".48" stop-color="#7e94a8" stop-opacity=".26" />
+          <stop offset="1" stop-color="#8ea3b6" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+
+      <!-- 朱砂日轮（半掩于远山之后） -->
+      <circle class="ink-sun" cx="1005" cy="100" r="48" fill="url(#gSun)" />
+
+      <!-- 远山：蓝灰 -->
+      <path class="ink-far" fill="url(#gFar)" filter="url(#inkRough)"
+        d="M -40 268 C 110 162, 214 132, 330 202 C 424 258, 474 198, 566 146
+           C 656 96, 738 142, 828 204 C 906 256, 986 196, 1086 140
+           C 1188 84, 1300 138, 1480 230 L 1480 420 L -40 420 Z" />
+
+      <!-- 云雾带（远山与中景之间的大留白） -->
+      <path class="ink-mist" fill="url(#gMist)" filter="url(#inkMist)"
+        d="M -40 238 C 260 214, 620 262, 900 232 C 1120 208, 1330 240, 1480 224 L 1480 300 L -40 312 Z" />
+
+      <!-- 中景：青绿 -->
+      <path class="ink-mid" fill="url(#gMid)" filter="url(#inkRough)"
+        d="M -40 302 C 96 220, 196 200, 306 250 C 388 288, 446 236, 546 198
+           C 648 158, 730 208, 830 262 C 930 316, 1012 248, 1122 200
+           C 1246 146, 1352 198, 1480 276 L 1480 420 L -40 420 Z" />
+
+      <!-- 近坡：墨绿，带皴笔 -->
+      <path class="ink-near" fill="url(#gNear)" filter="url(#inkRough)"
+        d="M -40 330 C 118 296, 238 290, 358 312 C 502 338, 622 300, 762 292
+           C 902 284, 1022 318, 1162 306 C 1302 294, 1402 318, 1480 306
+           L 1480 420 L -40 420 Z" />
+      <g class="ink-texture" stroke="#14261f" fill="none" stroke-linecap="round" opacity=".42" filter="url(#inkRoughSoft)">
+        <path d="M 70 344 C 118 328, 166 328, 214 340" stroke-width="1.7" />
+        <path d="M 150 360 C 204 344, 256 346, 306 358" stroke-width="1.3" />
+        <path d="M 250 378 C 306 364, 358 366, 410 376" stroke-width="1.1" />
+        <path d="M 430 332 C 480 314, 530 314, 580 328" stroke-width="1.7" />
+        <path d="M 510 350 C 566 334, 620 336, 672 348" stroke-width="1.2" />
+        <path d="M 600 372 C 656 358, 710 360, 762 370" stroke-width="1.1" />
+        <path d="M 830 326 C 882 308, 934 310, 986 324" stroke-width="1.7" />
+        <path d="M 920 346 C 976 330, 1030 332, 1084 344" stroke-width="1.2" />
+        <path d="M 1010 368 C 1066 354, 1120 356, 1174 366" stroke-width="1.1" />
+        <path d="M 1220 328 C 1272 312, 1324 314, 1376 326" stroke-width="1.6" />
+        <path d="M 1300 350 C 1352 336, 1402 338, 1450 348" stroke-width="1.1" />
+      </g>
+      <g class="ink-texture ink-texture--mid" stroke="#3d5a53" fill="none" stroke-linecap="round" opacity=".30" filter="url(#inkRoughSoft)">
+        <path d="M 330 252 C 372 238, 414 240, 456 250" stroke-width="1.4" />
+        <path d="M 560 208 C 604 194, 648 196, 690 208" stroke-width="1.4" />
+        <path d="M 848 268 C 892 254, 936 256, 980 268" stroke-width="1.4" />
+        <path d="M 1140 210 C 1184 196, 1228 198, 1272 210" stroke-width="1.3" />
+      </g>
+
+      <!-- 水面：以大留白为水 -->
+      <path class="ink-water" fill="url(#gWater)" filter="url(#inkRoughSoft)"
+        d="M -40 368 C 200 356, 420 380, 660 370 C 900 360, 1120 382, 1480 368 L 1480 420 L -40 420 Z" />
+      <g class="ink-wave" stroke="#6d7f80" fill="none" stroke-linecap="round" opacity=".38">
+        <path d="M 600 386 C 680 380, 760 380, 840 386" stroke-width="1.3" />
+        <path d="M 690 400 C 770 394, 850 394, 930 400" stroke-width="1.1" />
+        <path d="M 232 396 C 292 390, 352 390, 412 396" stroke-width="1.1" />
+      </g>
+
+      <!-- 孤舟 -->
+      <g class="ink-boat" opacity=".78" filter="url(#inkRoughSoft)" transform="translate(788,376)">
+        <path d="M 0 14 C 15 23, 41 23, 56 14 C 45 21, 11 21, 0 14 Z" fill="#14261f" />
+        <path d="M 27 -8 L 27 12" stroke="#14261f" stroke-width="1.5" />
+        <path d="M 27 -2 C 38 3, 42 8, 42 13" fill="none" stroke="#14261f" stroke-width="1.1" />
+      </g>
+
+      <!-- 飞鸟 -->
+      <g class="ink-birds" stroke="#37474a" fill="none" stroke-width="1.8" stroke-linecap="round" opacity=".55">
+        <path d="M 902 118 q 8 -9 16 0 M 918 118 q 8 -9 16 0" />
+        <path d="M 968 156 q 6 -7 12 0 M 980 156 q 6 -7 12 0" />
+        <path d="M 872 166 q 5 -6 10 0 M 882 166 q 5 -6 10 0" />
+      </g>
+    </svg>
+
+    <!-- 左右竹林 -->
+    <svg class="hero__bamboo hero__bamboo--l" viewBox="0 0 240 620" preserveAspectRatio="xMinYMax meet" aria-hidden="true" focusable="false">
+      <g class="bamboo-stalk" fill="none" stroke="#2c4a3f" stroke-linecap="round">
+        <path d="M 62 620 C 56 500 68 390 60 280 C 54 190 64 96 58 0" stroke-width="6" />
+        <path d="M 120 620 C 115 520 124 430 118 340 C 113 262 120 176 115 96" stroke-width="3.2" opacity=".8" />
+      </g>
+      <g class="bamboo-node" fill="#2c4a3f">
+        <ellipse cx="60" cy="470" rx="6.4" ry="2.6" /><ellipse cx="61" cy="360" rx="6.4" ry="2.6" />
+        <ellipse cx="59" cy="250" rx="6.4" ry="2.6" /><ellipse cx="61" cy="150" rx="6.4" ry="2.6" />
+        <ellipse cx="118" cy="420" rx="3.4" ry="1.5" /><ellipse cx="117" cy="300" rx="3.4" ry="1.5" />
+      </g>
+      <g class="bamboo-leaf" fill="#2c4a3f">
+        <use href="#leaf" transform="translate(66,272) rotate(8)" opacity=".95" />
+        <use href="#leaf" transform="translate(62,244) rotate(-30) scale(.92)" opacity=".9" />
+        <use href="#leaf" transform="translate(68,318) rotate(20) scale(.98)" opacity=".92" />
+        <use href="#leaf" transform="translate(58,204) rotate(-48) scale(.84)" opacity=".84" />
+        <use href="#leaf" transform="translate(60,172) rotate(-74) scale(.72)" opacity=".76" />
+        <use href="#leaf" transform="translate(60,150) rotate(-118) scale(.66)" opacity=".66" />
+        <use href="#leaf" transform="translate(116,392) rotate(-6) scale(.86)" opacity=".8" />
+        <use href="#leaf" transform="translate(114,356) rotate(-40) scale(.76)" opacity=".72" />
+        <use href="#leaf" transform="translate(120,452) rotate(16) scale(.78)" opacity=".7" />
+      </g>
+    </svg>
+    <svg class="hero__bamboo hero__bamboo--r" viewBox="0 0 240 620" preserveAspectRatio="xMaxYMax meet" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="#2c4a3f" stroke-linecap="round">
+        <path d="M 178 620 C 184 510 172 400 180 292 C 186 200 176 104 182 0" stroke-width="5.4" />
+      </g>
+      <g fill="#2c4a3f">
+        <ellipse cx="180" cy="500" rx="6" ry="2.5" /><ellipse cx="179" cy="392" rx="6" ry="2.5" />
+        <ellipse cx="181" cy="286" rx="6" ry="2.5" /><ellipse cx="179" cy="180" rx="6" ry="2.5" />
+      </g>
+      <g fill="#2c4a3f" transform="translate(360,0) scale(-1,1)">
+        <use href="#leaf" transform="translate(174,308) rotate(10)" opacity=".9" />
+        <use href="#leaf" transform="translate(170,278) rotate(-32) scale(.9)" opacity=".84" />
+        <use href="#leaf" transform="translate(176,356) rotate(22) scale(.94)" opacity=".86" />
+        <use href="#leaf" transform="translate(168,238) rotate(-52) scale(.8)" opacity=".78" />
+        <use href="#leaf" transform="translate(170,200) rotate(-80) scale(.7)" opacity=".7" />
+        <use href="#leaf" transform="translate(178,428) rotate(4) scale(.84)" opacity=".76" />
+      </g>
+    </svg>
+
+    <!-- 画心：藏青双线框 + 米色纸 -->
+    <div class="hero__panel">
+      <span class="hero__tab hero__tab--l" aria-hidden="true"></span>
+      <span class="hero__tab hero__tab--r" aria-hidden="true"></span>
+      <div class="hero__inner">
+        <p class="hero__kicker">剑网三 · 门派行旅</p>
+        <div class="hero__titlewrap">
+          <h1 class="hero__title">
+            <span class="hero__title-ink ink-write is-ready" data-text="江湖行纪" aria-label="江湖行纪"><span class="ink-g" aria-hidden="true">江</span><span class="ink-g" aria-hidden="true">湖</span><span class="ink-g" aria-hidden="true">行</span><span class="ink-g" aria-hidden="true">纪</span></span>
+          </h1>
+          <!-- 飞白墨点 -->
+          <span class="hero__splatter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        </div>
+        <p class="hero__sub">门派旅行图鉴</p>
+        <div class="hero__rule" aria-hidden="true"></div>
+        <p class="hero__lede">
+          二十处真实山水，各系一门剑网三流派。<br />
+          或循天策长枪入长安，或随藏剑孤剑访西湖——把江湖走成一场旅行。
+        </p>
+        <ul class="hero__stats" id="stats"></ul>
+      </div>
+    </div>
+
+    <!-- 葫芦印挂饰 -->
+    <svg class="hero__gourd" viewBox="0 0 96 172" aria-hidden="true" focusable="false">
+      <path class="gourd-cord" d="M48 -6 C 50 4, 45 11, 48 17" fill="none" />
+      <rect class="gourd-cork" x="41" y="13" width="14" height="10" rx="2.5" />
+      <path class="gourd-body" d="M48 21 C 42 21, 37 26, 37 34 C 37 42, 42 49, 47 53
+          C 38 59, 27 71, 24 85 C 19 105, 24 130, 34 140 C 42 148, 54 148, 62 140
+          C 72 130, 77 105, 72 85 C 69 71, 58 59, 49 53 C 54 49, 59 42, 59 34 C 59 26, 54 21, 48 21 Z" />
+      <rect class="gourd-seal" x="30" y="88" width="36" height="36" rx="3" />
+      <text class="gourd-seal-text" x="48" y="115" text-anchor="middle">纪</text>
+    </svg>
+
+    <!-- 画角题款 + 闲章 -->
+    <div class="hero__colophon" aria-hidden="true">
+      <span class="hero__colophon-text">江湖行纪 · 门派行旅图</span>
+      <span class="hero__seal">纪</span>
+    </div>
+  </header>
+
+  <!-- 江湖来信：拆封 · 尺素 -->
+  <section class="letter" id="letter">
+    <div class="letter__head">
+      <h2 class="letter__title">江湖来信</h2>
+      <p class="letter__hint">一封自山河间寄来的尺素 —— 拆开看看</p>
+    </div>
+
+    <div class="letter__stage">
+      <!-- 信封：竖长封套，朱红长方框 + 墨竹 + 竖排题字 + 朱砂小印 -->
+      <button class="envelope" type="button" id="envelope" aria-label="拆开这封信">
+        <span class="envelope__body"></span>
+        <span class="envelope__inside"></span>
+        <span class="envelope__frame"></span>
+        <svg class="envelope__bamboo" viewBox="0 0 470 530" aria-hidden="true" focusable="false">
+          <g fill="none" stroke="#2a2a24" stroke-linecap="round">
+            <path d="M 462 528 Q 430 468 413 439 Q 396 410 376 381 Q 356 352 333 326 Q 310 300 284 275 Q 258 250 230 226 Q 202 202 176 179 Q 150 156 129 135 Q 108 114 94 95 Q 80 76 72 60 L 64 44" stroke-width="6" />
+            <path d="M 356 352 Q 306.24 361.164 260.934 338.639" stroke-width="2.4" />
+            <path d="M 278.8 270 Q 236.713 290.512 191.282 279.199" stroke-width="2.4" />
+            <path d="M 191.6 192.8 Q 157.56 219.206 114.699 214.851" stroke-width="2.4" />
+            <path d="M 124.8 130.8 Q 85.0283 137.374 52.9981 112.898" stroke-width="2.4" />
+            <path d="M 409.6 433.2 Q 385.156 462.924 346.684 463.886" stroke-width="2.4" />
+          </g>
+          <g fill="#2a2a24">
+            <ellipse cx="409.6" cy="433.2" rx="5" ry="2.2" />
+            <ellipse cx="351.4" cy="346.8" rx="5" ry="2.2" />
+            <ellipse cx="278.8" cy="270" rx="5" ry="2.2" />
+            <ellipse cx="196.8" cy="197.4" rx="5" ry="2.2" />
+            <ellipse cx="124.8" cy="130.8" rx="5" ry="2.2" />
+            <ellipse cx="80" cy="76" rx="5" ry="2.2" />
+          </g>
+          <g fill="#2a2a24">
+            <use href="#leaf" transform="translate(72.5 39.1) rotate(-140.7) scale(1.1)" />
+            <use href="#leaf" transform="translate(70.7 37.3) rotate(-143.4) scale(1.21)" />
+            <use href="#leaf" transform="translate(58.9 43.4) rotate(-146.9) scale(1.03)" />
+            <use href="#leaf" transform="translate(56 53.4) rotate(-143.2) scale(1.12)" />
+            <use href="#leaf" transform="translate(56.9 35.8) rotate(-148.4) scale(1.05)" />
+            <use href="#leaf" transform="translate(69.7 42.5) rotate(-148.9) scale(1.43)" />
+            <use href="#leaf" transform="translate(65 35.6) rotate(-151.6) scale(1.23)" />
+            <use href="#leaf" transform="translate(73.4 40.4) rotate(-145) scale(1.22)" />
+            <use href="#leaf" transform="translate(58.9 44.9) rotate(-110.8) scale(1.39)" />
+            <use href="#leaf" transform="translate(270.3 340.2) rotate(-158.9) scale(1.19)" />
+            <use href="#leaf" transform="translate(259 336.3) rotate(-172.8) scale(1.23)" />
+            <use href="#leaf" transform="translate(253.9 345.5) rotate(-159.3) scale(1.05)" />
+            <use href="#leaf" transform="translate(267.8 347.8) rotate(-160.8) scale(1.12)" />
+            <use href="#leaf" transform="translate(256.9 335.4) rotate(-199.5) scale(0.91)" />
+            <use href="#leaf" transform="translate(265 342.9) rotate(-198.8) scale(1.16)" />
+            <use href="#leaf" transform="translate(262.7 332.8) rotate(-152.9) scale(1.11)" />
+            <use href="#leaf" transform="translate(193.5 278.4) rotate(-162.2) scale(1.17)" />
+            <use href="#leaf" transform="translate(200.9 272.3) rotate(-184.6) scale(0.97)" />
+            <use href="#leaf" transform="translate(184.9 277.6) rotate(-159.3) scale(0.84)" />
+            <use href="#leaf" transform="translate(183.2 276.9) rotate(-202.1) scale(0.98)" />
+            <use href="#leaf" transform="translate(194.2 278.8) rotate(-162.3) scale(0.84)" />
+            <use href="#leaf" transform="translate(184.6 280.2) rotate(-164.5) scale(0.93)" />
+            <use href="#leaf" transform="translate(190.9 274.1) rotate(-164.5) scale(0.86)" />
+            <use href="#leaf" transform="translate(183.5 274.8) rotate(-154.5) scale(1.11)" />
+            <use href="#leaf" transform="translate(120 204.9) rotate(-187.6) scale(1.18)" />
+            <use href="#leaf" transform="translate(108.5 209.9) rotate(-202.1) scale(1.17)" />
+            <use href="#leaf" transform="translate(124.5 212.9) rotate(-175.3) scale(1.23)" />
+            <use href="#leaf" transform="translate(113.8 216.8) rotate(-198.9) scale(1)" />
+            <use href="#leaf" transform="translate(121.6 210.9) rotate(-170.8) scale(1.01)" />
+            <use href="#leaf" transform="translate(121.1 222.4) rotate(-195.2) scale(1.08)" />
+            <use href="#leaf" transform="translate(43.6 105.9) rotate(-153.1) scale(0.95)" />
+            <use href="#leaf" transform="translate(48.2 113.6) rotate(-176.8) scale(1.2)" />
+            <use href="#leaf" transform="translate(60.1 114.6) rotate(-157.8) scale(1.2)" />
+            <use href="#leaf" transform="translate(59.7 110.7) rotate(-164.2) scale(0.92)" />
+            <use href="#leaf" transform="translate(47.6 106.2) rotate(-173.2) scale(1.04)" />
+            <use href="#leaf" transform="translate(50.2 104.2) rotate(-182.3) scale(1.17)" />
+            <use href="#leaf" transform="translate(353.7 460.7) rotate(-188.8) scale(0.98)" />
+            <use href="#leaf" transform="translate(339.9 459.8) rotate(-181.1) scale(1.07)" />
+            <use href="#leaf" transform="translate(347 466.2) rotate(-192.6) scale(1.1)" />
+            <use href="#leaf" transform="translate(350.5 464.8) rotate(-178.7) scale(0.93)" />
+            <use href="#leaf" transform="translate(355.6 463) rotate(-211.3) scale(0.99)" />
+            <use href="#leaf" transform="translate(350.1 469.7) rotate(-232.3) scale(1.19)" />
+            <use href="#leaf" transform="translate(325.1 300.9) rotate(-142.5) scale(0.79)" />
+            <use href="#leaf" transform="translate(309.4 312.5) rotate(-188.9) scale(0.83)" />
+            <use href="#leaf" transform="translate(309.5 315.2) rotate(-148.3) scale(0.99)" />
+            <use href="#leaf" transform="translate(317.4 315) rotate(-145.9) scale(0.73)" />
+            <use href="#leaf" transform="translate(164.1 166) rotate(-169.6) scale(0.72)" />
+            <use href="#leaf" transform="translate(172.2 164.6) rotate(-170.8) scale(0.66)" />
+            <use href="#leaf" transform="translate(170.1 179.2) rotate(-186.8) scale(0.66)" />
+            <use href="#leaf" transform="translate(173.7 178.5) rotate(-151) scale(0.72)" />
+            <use href="#leaf" transform="translate(87.8 93.6) rotate(-179.8) scale(0.99)" />
+            <use href="#leaf" transform="translate(100.1 82.4) rotate(-162.5) scale(0.81)" />
+            <use href="#leaf" transform="translate(86.7 89.3) rotate(-175.5) scale(0.97)" />
+            <use href="#leaf" transform="translate(87.2 95.3) rotate(-145.7) scale(0.85)" />
+          </g>
+        </svg>
+        <span class="envelope__inscribe"><i>寧可食無肉</i><i>不可居無竹</i></span>
+        <span class="envelope__sign">江湖行纪<b>纪</b></span>
+        <span class="envelope__flap"></span>
+      </button>
+
+      <!-- 信笺 -->
+      <article class="missive" id="missive" aria-label="江湖行纪来信" aria-hidden="true">
+        <span class="missive__paper" aria-hidden="true"></span>
+        <span class="missive__frame" aria-hidden="true"></span>
+        <div class="missive__text">
+          <p class="missive__body">江湖行纪启　前者偶得舆图一册，凡二十处真山水，各系一门剑派，皆在四海之内。或循天策长枪入长安，看长河落日；或随藏剑孤剑访西湖，听小桥流水；或携五毒之笛渡苗疆，共千蝶绕身。山河为笺，门派为印，不敢自秘，敬付君前。愿君行遍江湖，遇山见山，遇水见水，各得其所。<small class="missive__note">凡二十门，遍布西北·华北·华东·华中·西南·华南·东北七方</small></p>
+          <p class="missive__sign">大唐 · 江湖行纪　谨启<span class="missive__seal" aria-hidden="true"><i>江湖</i><i>行纪</i></span></p>
+        </div>
+      </article>
+    </div>
+
+    <button class="letter__btn" type="button" id="letter-btn" aria-expanded="false" aria-controls="missive">拆　阅</button>
+  </section>
+
+  <!-- 视图切换 + 天气系统 -->
+  <nav class="viewswitch" id="viewswitch">
+    <div class="viewswitch__group">
+      <button class="vbtn is-on" data-view="map">江湖舆图</button>
+      <button class="vbtn" data-view="cards">行旅卡片</button>
+      <button class="vbtn" data-view="routes">行程路线</button>
+      <button class="vbtn" data-view="comments">同门留言<span class="vbtn__n" id="cmt-total">0</span></button>
+    </div>
+    <div class="weather" id="weather" role="group" aria-label="天气系统">
+      <button class="wbtn is-on" data-weather="sunny" title="晴">晴</button>
+      <button class="wbtn" data-weather="rain" title="雨">雨</button>
+      <button class="wbtn" data-weather="snow" title="雪">雪</button>
+      <button class="wbtn wbtn--night" data-weather="night" title="夜">夜</button>
+    </div>
+  </nav>
+
+  <!-- 地图视图 -->
+  <section class="mapview" id="mapview">
+    <div class="atlas">
+      <!-- 题名 -->
+      <header class="atlas__head">
+        <div class="atlas__titlewrap">
+          <h2 class="atlas__title"><span class="atlas__title-ink ink-write" data-text="江湖行纪" aria-label="江湖行纪"><span class="ink-g" aria-hidden="true">江</span><span class="ink-g" aria-hidden="true">湖</span><span class="ink-g" aria-hidden="true">行</span><span class="ink-g" aria-hidden="true">纪</span></span></h2>
+          <p class="atlas__sub">二十门派 · 山河行旅</p>
+          <p class="atlas__rom">JIANGHU XING JI</p>
+        </div>
+        <p class="atlas__lede">二十处真山水，各系一门剑派。<br />点开山门，便知这一派该往何处行旅。</p>
+        <div class="atlas__marks">
+          <span class="atlas__stamp">山河入梦</span>
+          <span class="atlas__compass" aria-hidden="true">
+            <svg viewBox="0 0 60 60" focusable="false">
+              <circle class="cmp-ring" cx="30" cy="30" r="21" />
+              <circle class="cmp-ring cmp-ring--thin" cx="30" cy="30" r="12.5" />
+              <path class="cmp-needle" d="M30 8 L34.5 30 L30 52 L25.5 30 Z" />
+              <path class="cmp-north" d="M30 8 L34.5 30 L25.5 30 Z" />
+            </svg>
+            <b>北</b>
+          </span>
+        </div>
+      </header>
+
+      <!-- 北地四派 -->
+      <div class="atlas__band" id="atlas-top" aria-label="北地门派"></div>
+
+      <!-- 西陲六派 -->
+      <div class="atlas__col" id="atlas-left" aria-label="西陲门派"></div>
+
+      <!-- 舆图 -->
+      <div class="atlas__map">
+        <svg id="map-svg" viewBox="26 104 848 452" role="group" aria-label="剑网三江湖舆图"></svg>
+      </div>
+
+      <!-- 东境六派 -->
+      <div class="atlas__col" id="atlas-right" aria-label="东境门派"></div>
+
+      <!-- 南疆四派 -->
+      <div class="atlas__band" id="atlas-bot" aria-label="南疆门派"></div>
+
+      <!-- 图注：四美 + 落款 -->
+      <footer class="atlas__foot">
+        <ul class="atlas__badges">
+          <li>
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M16 2 L21 11.5 L18.2 11.5 L18.2 20 L13.8 20 L13.8 11.5 L11 11.5 Z" class="bd-solid" /><path d="M9.5 20.6 H22.5" class="bd-hilt bd-thick" /><path d="M16 21 V28" class="bd-hilt bd-thick" /></svg>
+            <b>剑意江湖</b><span>二十派武学</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M4 24 L12 11 L17 18 L21 13 L28 24 Z" /><circle cx="23.5" cy="8.5" r="2.6" class="bd-dot" /></svg>
+            <b>山河形胜</b><span>真山真水</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M16 27 C16 18, 10 13, 5 12 C10 9, 16 12, 16 18 C16 12, 22 9, 27 12 C22 13, 16 18, 16 27 Z" /></svg>
+            <b>四时风物</b><span>春秋各有味</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M7 11 h18 l-2 15 a2 2 0 0 1 -2 2 h-10 a2 2 0 0 1 -2 -2 Z" /><path d="M12 7 v4 M20 7 v4" class="bd-hilt" /></svg>
+            <b>人间烟火</b><span>街巷与酒肆</span>
+          </li>
+        </ul>
+        <p class="atlas__sign">与君同行 · 走遍山河<small>WALK THE WHOLE LAND</small><span class="atlas__seal">纪</span></p>
+      </footer>
+    </div>
+  </section>
+
+  <!-- 行程视图：自拟行程 + 现成行程 -->
+  <section class="routesview" id="routesview" hidden>
+    <div class="routes-head">
+      <h2 class="routes-title">江湖程途</h2>
+      <p class="routes-sub">JIANGHU CHENGTU · 行程</p>
+      <p class="routes-hint">九条现成线路可以照走；也可以自己从二十处去处里点几处，按点选的先后串成一条只属于你的线路。</p>
+    </div>
+
+    <!-- 自拟行程：点选 → 排序 → 存下 -->
+    <section class="mk" id="mk" aria-labelledby="mk-title">
+      <header class="mk-head">
+        <h3 class="mk-title" id="mk-title">自拟行程</h3>
+        <p class="mk-sub">MAKE YOUR OWN · 自己拣去处</p>
+        <p class="mk-count" id="mk-count"></p>
+      </header>
+
+      <div class="mk-body">
+        <!-- 左：草稿 -->
+        <div class="mk-draft">
+          <div class="mk-draft__head">
+            <span class="mk-label">我的路线</span>
+            <span class="mk-stat" id="mk-stat">尚无去处</span>
+          </div>
+          <ol class="mk-chain" id="mk-chain" aria-label="已选去处，按先后排列"></ol>
+          <p class="mk-empty" id="mk-empty">还没有去处。从二十处里点选，点选的先后就是行程的次序。</p>
+
+          <div class="mk-fields">
+            <label class="mk-field">
+              <span>行程名</span>
+              <input id="mk-name" type="text" maxlength="12" placeholder="不填则按首末二城取名" />
+            </label>
+            <label class="mk-field">
+              <span>一句话</span>
+              <input id="mk-hook" type="text" maxlength="46" placeholder="留给同行者的一句话（可空）" />
+            </label>
+          </div>
+
+          <div class="mk-acts">
+            <button class="mk-save" id="mk-save" type="button" disabled>存下此程</button>
+            <button class="mk-clear" id="mk-clear" type="button" disabled>重来</button>
+            <button class="mk-cancel" id="mk-cancel" type="button" hidden>取消修改</button>
+          </div>
+          <p class="mk-note" id="mk-note">每城按留一晚推算，天数自己长出来；城市之间的车次船班未计入。</p>
+        </div>
+
+        <!-- 右：二十处挑选格 -->
+        <div class="mk-pick">
+          <div class="mk-pick__head">
+            <span class="mk-label">二十处去处</span>
+            <span class="mk-pick__hint">点一次加入，再点一次移出</span>
+          </div>
+          <div class="mk-grid" id="mk-grid" role="group" aria-label="点选去处"></div>
+        </div>
+      </div>
+
+      <div class="mk-saved" id="mk-saved" aria-live="polite"></div>
+    </section>
+
+    <!-- 现成行程 -->
+    <div class="routes-sec">
+      <header class="sec-head">
+        <h3 class="sec-title">现成行程</h3>
+        <p class="sec-sub">九条线路，把二十处去处串成能照着走的日程</p>
+      </header>
+      <div class="routes-filter" id="routes-filter" role="group" aria-label="按行程天数筛选"></div>
+      <div class="routes-list" id="routes-list" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- 同门留言：全站留言板 -->
+  <section class="cmtview" id="cmtview" hidden>
+    <header class="cmt-head">
+      <h2 class="cmt-title">江湖客话</h2>
+      <p class="cmt-sub">JIANGHU KEHUA · 同门留言</p>
+      <p class="cmt-lede">走过的人留一句路引，未走的人来问一声。<br />二十处去处的留言都归在这本簿子里。</p>
+      <ul class="cmt-stats" id="cmt-stats"></ul>
+    </header>
+
+    <div class="cmt-body">
+      <!-- 左：落款 -->
+      <aside class="cmt-side">
+        <form class="cmt-form" id="cmt-form" novalidate>
+          <p class="cmt-form__head"><span>落　款</span><small>一百四十字以内</small></p>
+          <label class="cmt-field">
+            <span>名号</span>
+            <input id="cmt-name" name="name" type="text" maxlength="10"
+                   autocomplete="nickname" placeholder="你的江湖名号" />
+          </label>
+          <label class="cmt-field">
+            <span>门派</span>
+            <select id="cmt-school" name="school"></select>
+          </label>
+          <label class="cmt-field">
+            <span>何处</span>
+            <select id="cmt-city" name="city"></select>
+          </label>
+          <label class="cmt-field cmt-field--area">
+            <span>留言</span>
+            <textarea id="cmt-text" name="text" rows="4" maxlength="140"
+                      placeholder="路怎么走、什么时候去、值不值得……"></textarea>
+          </label>
+          <div class="cmt-form__foot">
+            <span class="cmt-form__count"><b>0</b>/140</span>
+            <span class="cmt-form__hint" id="cmt-hint" role="status" aria-live="polite"></span>
+            <button class="cmt-form__send" type="submit">落　款</button>
+          </div>
+        </form>
+        <p class="cmt-note">留言只存在这台设备的浏览器里，不上传、他人看不到。若要人人可见，需另接一个后端。</p>
+      </aside>
+
+      <!-- 右：留言流 -->
+      <div class="cmt-main">
+        <div class="cmt-toolbar">
+          <div class="cmt-scope" id="cmt-scope" role="group" aria-label="留言范围">
+            <button class="cmt-chip is-on" data-scope="all" aria-pressed="true">全部</button>
+            <button class="cmt-chip" data-scope="mine" aria-pressed="false">我写的</button>
+            <button class="cmt-chip" data-scope="liked" aria-pressed="false">我赞过</button>
+          </div>
+          <div class="cmt-sort" id="cmt-sort" role="group" aria-label="排序">
+            <button class="cmt-sortbtn is-on" data-sort="new" aria-pressed="true">最新</button>
+            <button class="cmt-sortbtn" data-sort="hot" aria-pressed="false">最热</button>
+          </div>
+        </div>
+        <div class="cmt-cities" id="cmt-cities" role="group" aria-label="按去处筛选"></div>
+        <ol class="cmt-list" id="cmt-list" aria-live="polite"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 卡片视图 -->
+  <section class="cardsview" id="cardsview" hidden>
+  <section class="board" id="board">
+    <div class="board__bar">
+      <div class="search">
+        <span class="search__icon" aria-hidden="true">⌕</span>
+        <input id="search" type="search" placeholder="搜城市、古称、门派或门派诗…" autocomplete="off" />
+      </div>
+      <p class="board__count" id="count"></p>
+      <div class="board__journey" id="journey" aria-live="polite"></div>
+    </div>
+    <div class="filters" id="filters"></div>
+  </section>
+
+  <!-- 卡片网格 -->
+  <main class="grid" id="grid" aria-live="polite"></main>
+  <p class="empty" id="empty" hidden>江湖辽阔，暂无符合此条件的去处。试试放宽筛选。</p>
+  </section>
+
+  <footer class="foot">
+    <p class="foot__cta">
+      <button class="foot__btn" type="button" data-goto="comments">同门留言 <b id="foot-cmt-n">0</b> 条 · 去说一句</button>
+    </p>
+    <p>江湖行纪 · 剑网三门派旅行图鉴 — 纯前端演示，门派设定参考《剑网3》世界观，旅行地均为真实名胜。</p>
+  </footer>
+
+  <!-- 详情弹层 -->
+  <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="m-city">
+    <div class="modal__mask" data-close></div>
+    <div class="modal__panel" id="modal-panel" role="document"></div>
+  </div>
+
+  <script src="assets/data.js"></script>
+  <script src="assets/map.js"></script>
+  <script src="assets/app.js"></script>
+  <script src="assets/weather.js"></script>
+  <script src="assets/letter.js"></script>
+</body>
+</html>

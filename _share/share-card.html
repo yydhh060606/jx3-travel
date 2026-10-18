@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<!-- 分享卡源文件（1200x630）。改完文案后用无头浏览器重出图：
+     msedge --headless=new --window-size=1200,630 --hide-scrollbars --virtual-time-budget=6000 \
+       --screenshot=../assets/share-1200x630.jpg "http://127.0.0.1:PORT/_share/share-card.html"
+     注意必须走本地 http（file:// 下 @font-face 与 SVG filter 可能不生效）。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+@font-face{font-family:"Noto Serif SC";font-weight:400;font-display:block;src:url("../assets/fonts/NotoSerifSC.woff2") format("woff2");}
+@font-face{font-family:"Ma Shan Zheng";font-weight:400;font-display:block;src:url("../assets/fonts/MaShanZheng.woff2") format("woff2");}
+
+:root{
+  --paper:#e4ded0; --paper-2:#ece7db; --paper-panel:#f3efe5;
+  --indigo:#2e3b52; --indigo-deep:#1e2a3d;
+  --ink-zhong:#4a463c; --ink-dan:#837c6d; --ink-nong:#26241d;
+  --jade:#2c4a3f; --seal:#b23a26; --seal-deep:#8b2a1b;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1200px;height:630px;overflow:hidden}
+body{
+  background:
+    radial-gradient(120% 90% at 18% 8%, #f2ede1 0%, rgba(242,237,225,0) 58%),
+    radial-gradient(90% 80% at 92% 10%, rgba(151,179,189,.22) 0%, rgba(151,179,189,0) 60%),
+    radial-gradient(100% 100% at 50% 120%, #d8d1c0 0%, rgba(216,209,192,0) 62%),
+    linear-gradient(168deg, #ece7db 0%, #e6e0d2 46%, #dfd8c8 100%);
+  font-family:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
+  position:relative;
+}
+
+/* 纸纤维与做旧水渍 */
+.tex{position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply;opacity:.72}
+.tex::before{content:"";position:absolute;inset:0;
+  background:
+    radial-gradient(38% 30% at 12% 78%, rgba(140,128,104,.16), transparent 70%),
+    radial-gradient(30% 26% at 84% 22%, rgba(140,128,104,.12), transparent 72%),
+    radial-gradient(24% 20% at 58% 96%, rgba(120,108,86,.14), transparent 74%);}
+.tex::after{content:"";position:absolute;inset:0;opacity:.5;
+  background-image:
+    repeating-linear-gradient(93deg, rgba(120,108,86,.05) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(7deg, rgba(120,108,86,.04) 0 1px, transparent 1px 6px);}
+
+/* 双线版框 */
+.frame{position:absolute;inset:22px;border:2.5px solid rgba(46,59,82,.42);pointer-events:none}
+.frame::before{content:"";position:absolute;inset:-8px;border:1.2px solid rgba(46,59,82,.24)}
+
+/* 山影 */
+.scene{position:absolute;left:0;right:0;bottom:-46px;width:1200px;height:300px;overflow:visible;opacity:.94}
+
+.inner{position:absolute;left:96px;top:82px;width:740px}
+
+.kicker{
+  font-size:14px;letter-spacing:.62em;text-indent:.62em;color:var(--seal);
+  margin-bottom:22px;
+}
+.title{line-height:1;font-weight:400;position:relative}
+.title span{
+  display:inline-block;
+  font-family:"STXingkai","华文行楷","Ma Shan Zheng","Kaiti SC","STKaiti","KaiTi",serif;
+  font-size:132px;line-height:1.02;letter-spacing:.02em;
+  color:var(--indigo-deep);
+  transform:skewX(-6.5deg) rotate(-1.1deg) scaleY(1.09);
+  transform-origin:50% 78%;
+  -webkit-text-stroke:2px var(--indigo-deep);
+  paint-order:stroke fill;
+  filter:url(#wildInk);
+  -webkit-mask-image:
+    repeating-linear-gradient(102deg,#000 0 22px,rgba(0,0,0,.6) 22px 23.8px,#000 23.8px 38px),
+    repeating-linear-gradient(74deg,#000 0 34px,rgba(0,0,0,.76) 34px 35.6px,#000 35.6px 60px);
+  mask-image:
+    repeating-linear-gradient(102deg,#000 0 22px,rgba(0,0,0,.6) 22px 23.8px,#000 23.8px 38px),
+    repeating-linear-gradient(74deg,#000 0 34px,rgba(0,0,0,.76) 34px 35.6px,#000 35.6px 60px);
+  text-shadow:.045em .04em 0 rgba(46,59,82,.13);
+}
+.sub{
+  margin-top:26px;
+  font-family:"Kaiti SC","STKaiti","KaiTi",serif;
+  font-size:29px;letter-spacing:.36em;text-indent:.36em;color:var(--jade);
+}
+.rule{width:230px;height:9px;margin-top:20px;
+  background:radial-gradient(60% 100% at 50% 50%,rgba(46,59,82,.5),rgba(46,59,82,.14) 62%,transparent 78%);}
+.lede{margin-top:22px;font-size:17.5px;line-height:1.95;color:var(--ink-zhong);letter-spacing:.04em}
+.lede b{font-weight:400;color:var(--seal-deep)}
+
+/* 右下题跋 */
+.colophon{position:absolute;right:76px;top:80px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.vtext{writing-mode:vertical-rl;text-orientation:upright;white-space:nowrap;width:24px;line-height:1.15;flex:0 0 auto;
+  font-family:"Kaiti SC","STKaiti","KaiTi",serif;font-size:15px;letter-spacing:.2em;
+  color:var(--indigo);opacity:.82}
+.seal{width:40px;height:40px;display:grid;place-items:center;background:var(--seal);
+  font-family:"Kaiti SC","STKaiti","KaiTi",serif;font-size:24px;line-height:1;color:#fdfbf6;
+  border-radius:4px;transform:rotate(-4deg);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.24),0 3px 9px rgba(139,42,27,.3)}
+.hide{position:absolute;width:0;height:0;overflow:hidden}
+</style>
+</head>
+<body>
+
+<!-- 复用首页的水墨滤镜 -->
+<svg class="hide" aria-hidden="true">
+  <defs>
+    <filter id="inkRough" x="-15%" y="-15%" width="130%" height="130%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.021 0.028" numOctaves="4" seed="13" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="inkRoughSoft" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.045 0.055" numOctaves="3" seed="6" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="inkMist"><feGaussianBlur stdDeviation="16"/></filter>
+    <filter id="wildInk" x="-16%" y="-16%" width="132%" height="132%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.026 0.038" numOctaves="4" seed="17" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="6.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<div class="tex"></div>
+
+<svg class="scene" viewBox="0 0 1440 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+  <defs>
+    <radialGradient id="gSun" cx="38%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#e0663c"/><stop offset=".55" stop-color="#cd4a2b"/><stop offset="1" stop-color="#a8351d"/>
+    </radialGradient>
+    <linearGradient id="gFar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#97b3bd" stop-opacity=".66"/><stop offset="1" stop-color="#97b3bd" stop-opacity=".10"/>
+    </linearGradient>
+    <linearGradient id="gMid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4e6c65" stop-opacity=".74"/><stop offset="1" stop-color="#4e6c65" stop-opacity=".15"/>
+    </linearGradient>
+    <linearGradient id="gNear" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14261f" stop-opacity=".94"/><stop offset=".6" stop-color="#14261f" stop-opacity=".72"/><stop offset="1" stop-color="#14261f" stop-opacity=".52"/>
+    </linearGradient>
+    <linearGradient id="gWater" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e6e0d1" stop-opacity=".58"/><stop offset=".35" stop-color="#f3efe5" stop-opacity=".96"/><stop offset="1" stop-color="#f3efe5" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="gMist" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3efe5" stop-opacity="0"/><stop offset=".48" stop-color="#f3efe5" stop-opacity=".97"/><stop offset="1" stop-color="#f3efe5" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="1005" cy="100" r="48" fill="url(#gSun)"/>
+
+  <path fill="url(#gFar)" filter="url(#inkRough)"
+    d="M -40 268 C 110 162, 214 132, 330 202 C 424 258, 474 198, 566 146
+       C 656 96, 738 142, 828 204 C 906 256, 986 196, 1086 140
+       C 1188 84, 1300 138, 1480 230 L 1480 420 L -40 420 Z"/>
+  <path fill="url(#gMist)" filter="url(#inkMist)"
+    d="M -40 238 C 260 214, 620 262, 900 232 C 1120 208, 1330 240, 1480 224 L 1480 300 L -40 312 Z"/>
+  <path fill="url(#gMid)" filter="url(#inkRough)"
+    d="M -40 302 C 96 220, 196 200, 306 250 C 388 288, 446 236, 546 198
+       C 648 158, 730 208, 830 262 C 930 316, 1012 248, 1122 200
+       C 1246 146, 1352 198, 1480 276 L 1480 420 L -40 420 Z"/>
+  <path fill="url(#gNear)" filter="url(#inkRough)"
+    d="M -40 330 C 118 296, 238 290, 358 312 C 502 338, 622 300, 762 292
+       C 902 284, 1022 318, 1162 306 C 1302 294, 1402 318, 1480 306
+       L 1480 420 L -40 420 Z"/>
+  <g stroke="#14261f" fill="none" stroke-linecap="round" opacity=".42" filter="url(#inkRoughSoft)">
+    <path d="M 70 344 C 118 328, 166 328, 214 340" stroke-width="1.7"/>
+    <path d="M 150 360 C 204 344, 256 346, 306 358" stroke-width="1.3"/>
+    <path d="M 250 378 C 306 364, 358 366, 410 376" stroke-width="1.1"/>
+    <path d="M 430 332 C 480 314, 530 314, 580 328" stroke-width="1.7"/>
+    <path d="M 510 350 C 566 334, 620 336, 672 348" stroke-width="1.2"/>
+    <path d="M 600 372 C 656 358, 710 360, 762 370" stroke-width="1.1"/>
+    <path d="M 830 326 C 882 308, 934 310, 986 324" stroke-width="1.7"/>
+    <path d="M 920 346 C 976 330, 1030 332, 1084 344" stroke-width="1.2"/>
+    <path d="M 1010 368 C 1066 354, 1120 356, 1174 366" stroke-width="1.1"/>
+    <path d="M 1220 328 C 1272 312, 1324 314, 1376 326" stroke-width="1.6"/>
+    <path d="M 1300 350 C 1352 336, 1402 338, 1450 348" stroke-width="1.1"/>
+  </g>
+  <g stroke="#3d5a53" fill="none" stroke-linecap="round" opacity=".30" filter="url(#inkRoughSoft)">
+    <path d="M 330 252 C 372 238, 414 240, 456 250" stroke-width="1.4"/>
+    <path d="M 560 208 C 604 194, 648 196, 690 208" stroke-width="1.4"/>
+    <path d="M 848 268 C 892 254, 936 256, 980 268" stroke-width="1.4"/>
+    <path d="M 1140 210 C 1184 196, 1228 198, 1272 210" stroke-width="1.3"/>
+  </g>
+  <path fill="url(#gWater)" filter="url(#inkRoughSoft)"
+    d="M -40 368 C 200 356, 420 380, 660 370 C 900 360, 1120 382, 1480 368 L 1480 420 L -40 420 Z"/>
+  <g stroke="#6d7f80" fill="none" stroke-linecap="round" opacity=".38">
+    <path d="M 600 386 C 680 380, 760 380, 840 386" stroke-width="1.3"/>
+    <path d="M 690 400 C 770 394, 850 394, 930 400" stroke-width="1.1"/>
+    <path d="M 232 396 C 292 390, 352 390, 412 396" stroke-width="1.1"/>
+  </g>
+  <g opacity=".78" filter="url(#inkRoughSoft)" transform="translate(788,376)">
+    <path d="M 0 14 C 15 23, 41 23, 56 14 C 45 21, 11 21, 0 14 Z" fill="#14261f"/>
+    <path d="M 27 -8 L 27 12" stroke="#14261f" stroke-width="1.5"/>
+    <path d="M 27 -2 C 38 3, 42 8, 42 13" fill="none" stroke="#14261f" stroke-width="1.1"/>
+  </g>
+  <g stroke="#37474a" fill="none" stroke-width="1.8" stroke-linecap="round" opacity=".55">
+    <path d="M 902 118 q 8 -9 16 0 M 918 118 q 8 -9 16 0"/>
+    <path d="M 968 156 q 6 -7 12 0 M 980 156 q 6 -7 12 0"/>
+    <path d="M 872 166 q 5 -6 10 0 M 882 166 q 5 -6 10 0"/>
+  </g>
+</svg>
+
+<div class="frame"></div>
+
+<div class="inner">
+  <p class="kicker">剑网三 · 门派行旅</p>
+  <h1 class="title"><span>江湖行纪</span></h1>
+  <p class="sub">门派旅行图鉴</p>
+  <div class="rule"></div>
+  <p class="lede">二十处真实山水，各系一门剑网三流派。<br>或循天策长枪入长安，或随藏剑孤剑访西湖 —— <b>把江湖走成一场旅行。</b></p>
+</div>
+
+<div class="colophon">
+  <span class="vtext">江湖行纪·门派行旅图</span>
+  <span class="seal">纪</span>
+</div>
+
+</body>
+</html>
