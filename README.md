@@ -42,17 +42,21 @@ GitHub Pages，`main` 分支根目录直接发布，无 Actions、无产物目�
 仓库根部的 `.nojekyll` 关闭 Jekyll 处理，避免下划线目录被忽略。
 
 在线地址：<https://yydhh060606.github.io/jx3-travel/>
+仓库地址：<https://github.com/yydhh060606/jx3-travel>
 
-首次发布三步：
+更新流程：改完直接推 `main`，Pages 会在 30–60 秒后自动重新发布。
 
-1. 在 GitHub 新建**空仓库** `jx3-travel`（不要勾 README / .gitignore / license）
-2. 双击仓库里的 `push-to-github.cmd`（首次会弹 GitHub 登录，登录后自动推送）
-3. 仓库 Settings → Pages → Source 选 `Deploy from a branch`，
-   Branch 选 `main`、目录选 `/ (root)`，保存后等 1–2 分钟
+```bash
+git add -A && git commit -m "改了什么" && git push
+```
 
-之后每次更新，`cmd` 里再跑一次或 `git push` 即可，Pages 会自动重新发布。
+> **本机注意**：Windows 的证书吊销检查（schannel）在当前离线证书列表下会报
+> `CRYPT_E_NO_REVOCATION_CHECK`，导致 `git push` 与浏览器访问 GitHub 都失败。
+> 本仓库的 `.git/config` 里为此设了 `http.sslVerify = false` 与
+> `http.schannelCheckRevoke = false`；网络环境正常后建议删掉这两项
+> （`git config --unset http.sslVerify`）。
 
-> 若要用网页上传：把本目录压缩包解压后，把 `index.html`、`assets/` 拖进仓库根目录即可，
+> 网页上传亦可：解压 `jx3-travel-site.zip`，把 `index.html`、`assets/` 拖进仓库根目录，
 > 其余目录只是开发期脚本，不影响站点运行。
 
 ## 数据说明
