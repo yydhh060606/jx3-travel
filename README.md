@@ -41,6 +41,20 @@ python -m http.server 8000
 GitHub Pages，`main` 分支根目录直接发布，无 Actions、无产物目录。
 仓库根部的 `.nojekyll` 关闭 Jekyll 处理，避免下划线目录被忽略。
 
+在线地址：<https://yydhh060606.github.io/jx3-travel/>
+
+首次发布三步：
+
+1. 在 GitHub 新建**空仓库** `jx3-travel`（不要勾 README / .gitignore / license）
+2. 双击仓库里的 `push-to-github.cmd`（首次会弹 GitHub 登录，登录后自动推送）
+3. 仓库 Settings → Pages → Source 选 `Deploy from a branch`，
+   Branch 选 `main`、目录选 `/ (root)`，保存后等 1–2 分钟
+
+之后每次更新，`cmd` 里再跑一次或 `git push` 即可，Pages 会自动重新发布。
+
+> 若要用网页上传：把本目录压缩包解压后，把 `index.html`、`assets/` 拖进仓库根目录即可，
+> 其余目录只是开发期脚本，不影响站点运行。
+
 ## 数据说明
 
 收藏、留言、自拟行程都存在浏览器 `localStorage`（键名 `jx3.*`），不上传、他人不可见。
