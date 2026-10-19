@@ -2309,6 +2309,13 @@ body.is-locked .modal { transition: none; }
   border-left: 3px solid var(--seal); background: var(--seal-soft);
 }
 .cmt-cloud.is-on { display: block; }
+.cmt-cloud__go {
+  display: inline-block; margin-left: 4px; padding: 0 9px 1px;
+  font-size: 11px; letter-spacing: .08em; color: #fff; background: var(--seal);
+  border-radius: 2px; text-decoration: none; vertical-align: 1px;
+  transition: background .2s ease;
+}
+.cmt-cloud__go:hover { background: var(--seal-deep, #8c3a2f); }
 
 /* ---- 入籍弹层 ---- */
 .ident-panel { grid-template-columns: 1fr; width: min(432px, 92vw); }

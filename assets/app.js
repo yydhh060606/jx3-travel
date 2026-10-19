@@ -604,12 +604,16 @@
     if (!tip) return;
     if (cmOnline) { tip.classList.remove('is-on'); tip.textContent = ''; return; }
     tip.classList.add('is-on');
-    const why = cmLastError ? '（' + cmLastError + '）' : '';
-    let html = `云端留言没连上${why}。现在显示的是本机留言，别人看不到你写的。`;
-    if (location.origin !== CANON.replace(/\/$/, '')) {
-      html += ` 想看全站的留言，请到 <a href="${CANON}" rel="noopener">${CANON.replace('https://', '')}</a>。`;
+
+    const mirror = location.origin !== CANON.replace(/\/$/, '');
+    if (mirror) {
+      // 镜像站（GitHub Pages 等）：不是连不上，是这个域名本来就没被云端授权
+      tip.innerHTML = '这是镜像版，留言只存在你本机，别人看不到。'
+        + `要和大家一起说话，请到 <a class="cmt-cloud__go" href="${CANON}" rel="noopener">主站</a>。`;
+      return;
     }
-    tip.innerHTML = html;
+    const why = cmLastError ? '（' + cmLastError + '）' : '';
+    tip.innerHTML = `留言暂时没连上${why}，先记在本机。刷新一次或稍后再试。`;
   }
 
   async function refreshComments() {
