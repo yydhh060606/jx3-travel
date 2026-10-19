@@ -17,10 +17,10 @@
        og:url 与 og:image 必须是绝对地址，抓取器不解析相对路径。 -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="江湖行纪" />
-  <meta property="og:url" content="https://yydhh060606.github.io/jx3-travel/" />
+  <meta property="og:url" content="https://jx3-travel.app.workbuddy.host/" />
   <meta property="og:title" content="江湖行纪 · 剑网三门派旅行图鉴" />
   <meta property="og:description" content="二十处真实山水，各系一门剑网三流派。或循天策长枪入长安，或随藏剑孤剑访西湖——把江湖走成一场旅行。" />
-  <meta property="og:image" content="https://yydhh060606.github.io/jx3-travel/assets/share-1200x630.jpg" />
+  <meta property="og:image" content="https://jx3-travel.app.workbuddy.host/assets/share-1200x630.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="江湖行纪 · 剑网三门派旅行图鉴" />
@@ -28,7 +28,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="江湖行纪 · 剑网三门派旅行图鉴" />
   <meta name="twitter:description" content="二十处真实山水，各系一门剑网三流派。把江湖走成一场旅行。" />
-  <meta name="twitter:image" content="https://yydhh060606.github.io/jx3-travel/assets/share-1200x630.jpg" />
+  <meta name="twitter:image" content="https://jx3-travel.app.workbuddy.host/assets/share-1200x630.jpg" />
 
   <!-- 毛笔笔触字体：已按用字子集化并自托管（见 style.css 顶部 @font-face），无需外链 -->
   <link rel="stylesheet" href="assets/style.css" />
@@ -389,7 +389,7 @@
       </article>
     </div>
 
-    <button class="letter__btn" type="button" id="letter-btn" aria-expanded="false" aria-controls="missive">拆　阅</button>
+    <button class="letter__btn" type="button" id="letter-btn" data-sfx="unseal" aria-expanded="false" aria-controls="missive">拆　阅</button>
   </section>
 
   <!-- 视图切换 + 天气系统 -->
@@ -400,11 +400,16 @@
       <button class="vbtn" data-view="routes">行程路线</button>
       <button class="vbtn" data-view="comments">侠客留言<span class="vbtn__n" id="cmt-total">0</span></button>
     </div>
-    <div class="weather" id="weather" role="group" aria-label="天气系统">
-      <button class="wbtn is-on" data-weather="sunny" title="晴">晴</button>
-      <button class="wbtn" data-weather="rain" title="雨">雨</button>
-      <button class="wbtn" data-weather="snow" title="雪">雪</button>
-      <button class="wbtn wbtn--night" data-weather="night" title="夜">夜</button>
+    <div class="viewswitch__side">
+      <div class="weather" id="weather" role="group" aria-label="天气系统">
+        <button class="wbtn is-on" data-weather="sunny" title="晴">晴</button>
+        <button class="wbtn" data-weather="rain" title="雨">雨</button>
+        <button class="wbtn" data-weather="snow" title="雪">雪</button>
+        <button class="wbtn wbtn--night" data-weather="night" title="夜">夜</button>
+      </div>
+      <!-- 背景音开关：首次点击页面任意处即起乐（浏览器要求先有手势） -->
+      <button class="wbtn wbtn--sound is-await" id="sound-btn" type="button"
+              aria-pressed="true" aria-label="背景音：开，点击关闭" title="背景音：开">音</button>
     </div>
   </nav>
 
@@ -556,6 +561,13 @@
     <div class="cmt-body">
       <!-- 左：落款 -->
       <aside class="cmt-side">
+        <button class="idcard" id="idcard" type="button" aria-haspopup="dialog">
+          <span class="idcard__ava" aria-hidden="true">未</span>
+          <span class="idcard__body">
+            <b class="idcard__name">未入籍</b>
+            <em class="idcard__hint">点此报名号与门派</em>
+          </span>
+        </button>
         <form class="cmt-form" id="cmt-form" novalidate>
           <p class="cmt-form__head"><span>落　款</span><small>一百四十字以内</small></p>
           <label class="cmt-field">
@@ -582,11 +594,12 @@
             <button class="cmt-form__send" type="submit">落　款</button>
           </div>
         </form>
-        <p class="cmt-note">留言只存在这台设备的浏览器里，不上传、他人看不到。若要人人可见，需另接一个后端。</p>
+        <p class="cmt-note" id="cmt-note">留言写在云端，人人可见。名号与门派存在本机，换设备要重新落籍。</p>
       </aside>
 
       <!-- 右：留言流 -->
       <div class="cmt-main">
+        <div class="cmt-cloud" id="cmt-cloud" role="status"></div>
         <div class="cmt-toolbar">
           <div class="cmt-scope" id="cmt-scope" role="group" aria-label="留言范围">
             <button class="cmt-chip is-on" data-scope="all" aria-pressed="true">全部</button>
@@ -636,6 +649,41 @@
     <div class="modal__panel" id="modal-panel" role="document"></div>
   </div>
 
+  <!-- 入籍：名号 + 门派，无密码。落籍之后才好在簿子上落款 -->
+  <div class="modal" id="ident" hidden role="dialog" aria-modal="true" aria-labelledby="ident-title">
+    <div class="modal__mask" data-ident-close></div>
+    <div class="modal__panel ident-panel" role="document">
+      <button class="modal__close" type="button" data-ident-close aria-label="关闭">✕</button>
+      <div class="ident">
+        <p class="ident__sub">LUO JI · 落 籍</p>
+        <h2 class="ident__title" id="ident-title">报上名号</h2>
+        <p class="ident__lede">不用手机号，也不要密码。<br />往后在这本簿子上说话，都署这个名；删改也只认这台设备。</p>
+        <form class="ident__form" id="ident-form" novalidate>
+          <label class="ident__field">
+            <span>名号</span>
+            <input id="ident-name" type="text" maxlength="10" autocomplete="off"
+                   placeholder="二到十字，江湖上怎么称呼你" />
+          </label>
+          <label class="ident__field">
+            <span>门派</span>
+            <select id="ident-school"></select>
+          </label>
+          <p class="ident__err" id="ident-err" role="alert"></p>
+          <div class="ident__acts">
+            <button class="ident__cancel" type="button" data-ident-close>再想想</button>
+            <button class="ident__ok" type="submit">落　籍</button>
+          </div>
+        </form>
+        <p class="ident__note">换个浏览器、清了缓存，名号就没了——再报一次即可，旧留言还在。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 云 SDK（@tencent-ai/workbuddy-cloud-sdk 0.1.4-dev 的 IIFE 构建）自托管：
+       jsdelivr 在国内时通时不通，登录不该看 CDN 脸色。升级时换这个文件即可。 -->
+  <script src="assets/vendor/workbuddy-cloud.js"></script>
+  <script src="assets/audio.js"></script>
+  <script src="assets/cloud.js"></script>
   <script src="assets/data.js"></script>
   <script src="assets/map.js"></script>
   <script src="assets/app.js"></script>

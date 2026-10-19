@@ -291,10 +291,18 @@
       </article>`;
   }
 
-  /* ---------- 侠客留言（纯本地：只存在这台设备的 localStorage） ---------- */
-  const C_KEY = 'jx3.comments.v1';      // { destId: [ {cid,name,school,text,ts,likes} ] }
-  const CU_KEY = 'jx3.commenter.v1';    // { name, school } 记住上次落款
-  const CL_KEY = 'jx3.likes.v1';        // { 'destId:cid': 1 }
+  /* ---------- 侠客留言 ----------
+   * 在线：全部来自云端（cloud.js 的四个函数），任何人写，任何人看得见。
+   * 离线：退回本机存储（C_KEY / CL_KEY），界面明说"只有这一台看得见"。
+   * 两条路的行数据在这里归一化成同一副样子，上层渲染不用分叉。
+   */
+  const C_KEY = 'jx3.comments.v1';      // 本机留言 { destId: [ {cid,name,school,text,ts,likes} ] }
+  const CU_KEY = 'jx3.commenter.v1';    // 上次落款 { name, school }
+  const CL_KEY = 'jx3.likes.v1';        // 本机赞 { 'destId:cid': 1 }
+
+  let cmOnline = false;                 // 云端是否可用
+  let cmRows = [];                      // 云端全量留言（含 destId），在线时唯一数据源
+  let cmLastError = '';
 
   function readJSON(key, fallback) {
     try {
@@ -312,6 +320,176 @@
   let commenter = readJSON(CU_KEY, { name: '', school: '' });
   let pendingDel = null;
 
+  /* ---------- 落籍：名号 + 门派，存在本机；云端只认它的哈希 ---------- */
+  function ident() {
+    return (window.JHCloud && JHCloud.ident()) || null;
+  }
+
+  function paintIdCard() {
+    const card = $('#idcard');
+    const me = ident();
+    if (card) {
+      card.classList.toggle('is-on', !!me);
+      card.querySelector('.idcard__ava').textContent = me ? me.name.slice(0, 1) : '未';
+      card.querySelector('.idcard__name').textContent = me
+        ? (me.school ? me.name + ' · ' + me.school : me.name)
+        : '未入籍';
+      card.querySelector('.idcard__hint').textContent = me ? '点此换个名号' : '点此报名号与门派';
+    }
+    // 表单里的名号 / 门派跟着锁死，避免"卡片是一个名、表单是另一个名"
+    const nameEl = $('#cmt-name');
+    const schoolEl = $('#cmt-school');
+    if (nameEl) {
+      nameEl.value = me ? me.name : (commenter.name || '');
+      nameEl.disabled = !!me;
+    }
+    if (schoolEl && me) {
+      schoolEl.value = me.school;
+      schoolEl.disabled = true;
+    } else if (schoolEl) {
+      schoolEl.disabled = false;
+    }
+  }
+
+  let identAfter = null;   // 落籍之后接着做的那件事（通常是"把这条留言发出去"）
+
+  function openIdent(after) {
+    identAfter = typeof after === 'function' ? after : null;
+    const box = $('#ident');
+    if (!box) return;
+    const me = ident();
+    const nameEl = $('#ident-name');
+    const schoolEl = $('#ident-school');
+    const errEl = $('#ident-err');
+    if (schoolEl && !schoolEl.options.length) {
+      schoolEl.innerHTML = Object.keys(SCHOOLS).map((s) => (
+        `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`
+      )).join('');
+    }
+    if (nameEl) {
+      nameEl.value = me ? me.name : (commenter.name || '');
+      nameEl.classList.remove('is-err');
+    }
+    if (schoolEl) schoolEl.value = me ? me.school : (commenter.school || '天策');
+    if (errEl) errEl.textContent = '';
+    box.hidden = false;
+    lockScroll();
+    if (window.Sound) Sound.sfx('swish');
+    setTimeout(() => { if (nameEl) nameEl.focus(); }, 80);
+  }
+
+  function closeIdent() {
+    const box = $('#ident');
+    if (box) box.hidden = true;
+    identAfter = null;
+    const detail = $('#modal');
+    if (!detail || detail.hidden) unlockScroll();
+  }
+
+  function bindIdent() {
+    const box = $('#ident');
+    if (!box) return;
+    const card = $('#idcard');
+    if (card) card.addEventListener('click', () => openIdent());
+    box.addEventListener('click', (e) => {
+      if (e.target.closest('[data-ident-close]')) closeIdent();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !box.hidden) closeIdent();
+    });
+    const form = $('#ident-form');
+    if (!form) return;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const nameEl = $('#ident-name');
+      const schoolEl = $('#ident-school');
+      const errEl = $('#ident-err');
+      const name = (nameEl.value || '').trim();
+      if (name.length < 2) {
+        nameEl.classList.add('is-err');
+        errEl.textContent = '名号至少两个字，不然不好称呼。';
+        nameEl.focus();
+        return;
+      }
+      JHCloud.enrol(name, schoolEl.value);
+      paintIdCard();
+      if (window.Sound) Sound.sfx('seal');
+      const after = identAfter;
+      closeIdent();
+      if (after) after();
+    });
+    // 输入即清错
+    $('#ident-name').addEventListener('input', (e) => {
+      e.target.classList.remove('is-err');
+      $('#ident-err').textContent = '';
+    });
+  }
+
+  /* ---------- 云端留言：拉取 / 重绘 ---------- */
+  function remoteRow(r) {
+    return {
+      cid: String(r.id),
+      destId: r.dest_id,
+      name: r.name,
+      school: r.school,
+      text: r.body,
+      ts: r.created_at,
+      likes: r.likes || 0,
+      mine: !!r.mine,
+      liked: !!r.liked,
+      remote: true
+    };
+  }
+
+  // 云端只认一个域名（发布域名），换到别的地址打开就只剩本机留言
+  const CANON = 'https://jx3-travel.app.workbuddy.host/';
+
+  function paintCloudTip() {
+    const tip = $('#cmt-cloud');
+    if (!tip) return;
+    if (cmOnline) { tip.classList.remove('is-on'); tip.textContent = ''; return; }
+    tip.classList.add('is-on');
+    const why = cmLastError ? '（' + cmLastError + '）' : '';
+    let html = `云端留言没连上${why}。现在显示的是本机留言，别人看不到你写的。`;
+    if (location.origin !== CANON.replace(/\/$/, '')) {
+      html += ` 想看全站的留言，请到 <a href="${CANON}" rel="noopener">${CANON.replace('https://', '')}</a>。`;
+    }
+    tip.innerHTML = html;
+  }
+
+  async function refreshComments() {
+    if (!window.JHCloud || !JHCloud.available) {
+      cmOnline = false;
+      cmLastError = '云端脚本没加载出来';
+      paintCloudTip();
+      return;
+    }
+    const res = await JHCloud.list();
+    if (res.ok && Array.isArray(res.data)) {
+      cmOnline = true;
+      cmLastError = '';
+      cmRows = res.data.map(remoteRow);
+    } else {
+      cmOnline = false;
+      cmLastError = res.error || '';
+    }
+    paintCloudTip();
+    paintCommentsEverywhere();
+  }
+
+  // 云端数据变了以后，把看得见的几处一起重画
+  function paintCommentsEverywhere() {
+    const total = cmtCounts().total;
+    ['#cmt-total', '#foot-cmt-n'].forEach((sel) => {
+      const el = $(sel);
+      if (el) el.textContent = total;
+    });
+    const board = $('#cmt-list');
+    if (board) renderCmtBoard();
+    const openId = $('#modal').hidden ? null : currentDetailId;
+    if (openId) repaintComments(openId);
+  }
+
   function todayStr() {
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
@@ -320,7 +498,9 @@
   // 相对时间：近 30 天说「N 天前」，再往前按月，超过一年直接给日期
   function relTime(ts) {
     if (!ts) return '';
-    const t = new Date(String(ts).replace(/-/g, '/')).getTime();
+    // 云端给的是 ISO（2026-10-12T00:00:00+08:00），本机存的是 2026-10-12
+    let t = Date.parse(ts);
+    if (isNaN(t)) t = new Date(String(ts).replace(/-/g, '/')).getTime();
     if (isNaN(t)) return ts;
     const days = Math.floor((Date.now() - t) / 86400000);
     if (days <= 0) return '今天';
@@ -329,15 +509,16 @@
     if (days < 365) return Math.floor(days / 30) + ' 个月前';
     return ts;
   }
-  // 种子留言在前、本人留言在前一档，整体按时间倒序
+  // 某一处的留言。在线时全部来自云端；离线时退回本机那份
   function listComments(id) {
+    if (cmOnline) return cmRows.filter((c) => c.destId === id);
     const seed = (SEED_COMMENTS[id] || []).map((c, i) => Object.assign({ mine: false }, c, { cid: 's' + i }));
     const mine = (userComments[id] || []).map((c) => Object.assign({ mine: true }, c));
     return mine.concat(seed).sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
   }
-  function schoolOptions(id) {
+  function schoolOptions(id, prefer) {
     const d = DEST_BY_ID[id];
-    const cur = commenter.school || (d && d.school) || '天策';
+    const cur = prefer || commenter.school || (d && d.school) || '天策';
     return Object.keys(SCHOOLS).map((n) => (
       `<option value="${escapeHTML(n)}"${n === cur ? ' selected' : ''}>${escapeHTML(n)}</option>`
     )).join('');
@@ -345,8 +526,8 @@
 
   function commentHTML(c, id) {
     const key = id + ':' + c.cid;
-    const on = !!likedMap[key];
-    const n = (c.likes || 0) + (on ? 1 : 0);
+    const on = c.remote ? !!c.liked : !!likedMap[key];
+    const n = c.remote ? (c.likes || 0) : (c.likes || 0) + (on ? 1 : 0);
     return `
       <li class="cm${c.mine ? ' cm--mine' : ''}" data-cid="${escapeHTML(c.cid)}">
         <span class="cm__ava" style="--c:${schoolColor(c.school)}" aria-hidden="true">${escapeHTML(String(c.school).slice(0, 1))}</span>
@@ -360,6 +541,7 @@
           <p class="cm__acts">
             <button class="cm__like${on ? ' is-on' : ''}" type="button" data-like="${escapeHTML(c.cid)}" data-base="${c.likes || 0}" aria-pressed="${on}" aria-label="赞同这条留言">赞 <b>${n}</b></button>
             <button class="cm__del" type="button" data-del="${escapeHTML(c.cid)}"${c.mine ? '' : ' hidden'}>删去</button>
+            <button class="cm__report" type="button" data-report="${escapeHTML(c.cid)}" title="举报这条留言">举报</button>
           </p>
         </div>
       </li>`;
@@ -367,6 +549,7 @@
 
   function commentsHTML(id) {
     const list = listComments(id);
+    const me = ident();
     const items = list.length
       ? list.map((c) => commentHTML(c, id)).join('')
       : '<li class="cm-empty">这一处还没有人留言，来做第一个。</li>';
@@ -376,8 +559,9 @@
         <form class="cm-form" id="cm-form" novalidate>
           <div class="cm-form__row">
             <input class="cm-form__name" name="name" type="text" maxlength="10" autocomplete="nickname"
-                   placeholder="你的江湖名号" aria-label="昵称" value="${escapeHTML(commenter.name || '')}" />
-            <select class="cm-form__school" name="school" aria-label="门派">${schoolOptions(id)}</select>
+                   placeholder="你的江湖名号" aria-label="昵称"
+                   value="${escapeHTML(me ? me.name : (commenter.name || ''))}"${me ? ' disabled' : ''} />
+            <select class="cm-form__school" name="school" aria-label="门派"${me ? ' disabled' : ''}>${schoolOptions(id, me && me.school)}</select>
           </div>
           <textarea class="cm-form__text" name="text" rows="2" maxlength="140"
                     placeholder="说说这处地方 —— 路怎么走、什么时候去、值不值得。" aria-label="留言内容"></textarea>
@@ -388,7 +572,7 @@
           </div>
         </form>
         <ul class="cm-list" id="cm-list">${items}</ul>
-        <p class="cm-note">留言只存在这台设备的浏览器里，不上传、不显示给他人。</p>
+        <p class="cm-note">留言写在云端，人人都看得见；删去只认你这台设备。</p>
       </div>`;
   }
 
@@ -430,45 +614,82 @@
       say('');
     });
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = nameEl.value.trim();
       const text = textEl.value.trim();
-
-      if (!name) { nameEl.classList.add('is-err'); nameEl.focus(); say('先留个名号。', true); return; }
+      const me = ident();
+      if (!me) { openIdent(() => form.requestSubmit()); return; }
       if (!text) { textEl.focus(); say('还没写内容。', true); return; }
 
-      const rec = {
-        cid: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        name: name.slice(0, 10),
-        school: schoolEl.value,
-        text: text.slice(0, 140),
-        ts: todayStr(),
-        likes: 0,
-      };
-      (userComments[id] = userComments[id] || []).push(rec);
-      if (!writeJSON(C_KEY, userComments)) {
-        userComments[id].pop();
-        say('留言没能存下：数据本身有问题，刷新后再试一次。', true);
-        return;
+      const btn = form.querySelector('.cm-form__send');
+      btn.disabled = true;
+
+      if (cmOnline) {
+        const res = await JHCloud.add(id, text.slice(0, 140));
+        btn.disabled = false;
+        if (!res.ok) { say(res.error, true); return; }
+        const raw = Array.isArray(res.data) ? res.data[0] : res.data;
+        const row = remoteRow(raw);
+        row.mine = true;
+        row.liked = false;
+        cmRows.unshift(row);
+      } else {
+        const rec = {
+          cid: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+          name: me.name.slice(0, 10),
+          school: me.school,
+          text: text.slice(0, 140),
+          ts: todayStr(),
+          likes: 0,
+        };
+        (userComments[id] = userComments[id] || []).push(rec);
+        if (!writeJSON(C_KEY, userComments)) {
+          userComments[id].pop();
+          btn.disabled = false;
+          say('留言没能存下：数据本身有问题，刷新后再试一次。', true);
+          return;
+        }
+        btn.disabled = false;
       }
-      commenter = { name: rec.name, school: rec.school };
-      writeJSON(CU_KEY, commenter);
 
       textEl.value = '';
       countEl.textContent = '0';
       repaintComments(id);
-      say(store.volatile ? '已落款，仅此一窗。' : '已落款。');
+      say(cmOnline ? '已落款。' : (store.volatile ? '已落款，仅此一窗。' : '已落款，但只在本机。'));
       // 让新留言出现在视野里
       const first = box.querySelector('#cm-list .cm');
       if (first) first.scrollIntoView({ block: 'nearest' });
     });
 
-    // 赞 / 删：事件委托，重绘列表后依然有效
+    // 赞 / 删 / 举报：事件委托，重绘列表后依然有效
     box.addEventListener('click', (e) => {
+      const rep = e.target.closest('[data-report]');
+      if (rep) {
+        if (!ident()) { openIdent(); return; }
+        if (!cmOnline) { say('本机留言不必举报。'); return; }
+        rep.disabled = true;
+        JHCloud.report(rep.dataset.report).then((res) => {
+          rep.disabled = false;
+          say(res.ok ? '已报官，多谢。' : res.error, !res.ok);
+        });
+        return;
+      }
+
       const like = e.target.closest('.cm__like');
       if (like) {
         const cid = like.dataset.like;
+        const row = cmRows.find((c) => c.remote && c.cid === cid);
+        if (row) {
+          like.disabled = true;
+          JHCloud.like(cid).then((res) => {
+            like.disabled = false;
+            if (!res.ok) { say(res.error, true); return; }
+            row.liked = !!res.data.liked;
+            row.likes = res.data.likes;
+            repaintComments(id);
+          });
+          return;
+        }
         const key = id + ':' + cid;
         const on = !like.classList.contains('is-on');
         if (on) likedMap[key] = 1; else delete likedMap[key];
@@ -484,6 +705,16 @@
         const cid = del.dataset.del;
         if (pendingDel === cid) {
           pendingDel = null;
+          const row = cmRows.find((c) => c.remote && c.cid === cid);
+          if (row) {
+            JHCloud.del(cid).then((res) => {
+              if (!res.ok) { say(res.error, true); return; }
+              cmRows = cmRows.filter((c) => c !== row);
+              repaintComments(id);
+              say('已删去。');
+            });
+            return;
+          }
           userComments[id] = (userComments[id] || []).filter((c) => c.cid !== cid);
           writeJSON(C_KEY, userComments);
           repaintComments(id);
@@ -513,6 +744,7 @@
   let cmtPendingDel = null;
 
   function allComments() {
+    if (cmOnline) return cmRows.slice();
     const out = [];
     DESTINATIONS.forEach((d) => {
       listComments(d.id).forEach((c) => out.push(Object.assign({}, c, { destId: d.id })));
@@ -523,6 +755,7 @@
   }
 
   function likeCount(c) {
+    if (c.remote) return c.likes || 0;
     return (c.likes || 0) + (likedMap[c.destId + ':' + c.cid] ? 1 : 0);
   }
 
@@ -534,7 +767,7 @@
     all.forEach((c) => {
       if (c.mine) mine++;
       if (c.destId !== CM_ALL) cities.add(c.destId);
-      if (likedMap[c.destId + ':' + c.cid]) liked++;
+      if (c.remote ? c.liked : likedMap[c.destId + ':' + c.cid]) liked++;
     });
     return { total: all.length, cities: cities.size, mine: mine, liked: liked };
   }
@@ -570,7 +803,7 @@
 
   function cmtCardHTML(c) {
     const key = c.destId + ':' + c.cid;
-    const on = !!likedMap[key];
+    const on = c.remote ? !!c.liked : !!likedMap[key];
     const dest = DEST_BY_ID[c.destId];
     const at = dest
       ? `<button class="cc__at" type="button" data-goto-city="${escapeHTML(c.destId)}"
@@ -594,6 +827,8 @@
               data-base="${c.likes || 0}" aria-pressed="${on}" aria-label="赞同这条留言">赞 <b>${likeCount(c)}</b></button>
             <button class="cc__del" type="button" data-del="${escapeHTML(c.cid)}"
               data-dest="${escapeHTML(c.destId)}"${c.mine ? '' : ' hidden'}>删去</button>
+            <button class="cc__report" type="button" data-report="${escapeHTML(c.cid)}"
+              data-dest="${escapeHTML(c.destId)}" title="举报这条留言">举报</button>
           </p>
         </div>
       </li>`;
@@ -618,7 +853,9 @@
     let rows = allComments();
     if (cmtState.city !== 'all') rows = rows.filter((c) => c.destId === cmtState.city);
     if (cmtState.scope === 'mine') rows = rows.filter((c) => c.mine);
-    if (cmtState.scope === 'liked') rows = rows.filter((c) => likedMap[c.destId + ':' + c.cid]);
+    if (cmtState.scope === 'liked') {
+      rows = rows.filter((c) => (c.remote ? c.liked : likedMap[c.destId + ':' + c.cid]));
+    }
 
     rows.sort(cmtState.sort === 'hot'
       ? (a, b) => likeCount(b) - likeCount(a) || String(b.ts).localeCompare(String(a.ts))
@@ -674,6 +911,7 @@
         `<option value="${escapeHTML(d.id)}">${escapeHTML(d.city)} · ${escapeHTML(d.school)}</option>`
       ))).join('');
     if (commenter.name) nameEl.value = commenter.name;
+    paintIdCard();
 
     const say = (msg, bad) => {
       hintEl.textContent = msg;
@@ -688,30 +926,47 @@
       say('');
     });
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = nameEl.value.trim();
       const text = textEl.value.trim();
-      if (!name) { nameEl.classList.add('is-err'); nameEl.focus(); say('先留个名号。', true); return; }
+      const me = ident();
+      // 没落籍先落籍，落完自动接着发
+      if (!me) { openIdent(() => form.requestSubmit()); return; }
       if (!text) { textEl.focus(); say('还没写内容。', true); return; }
 
       const destId = cityEl.value || CM_ALL;
-      const rec = {
-        cid: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-        name: name.slice(0, 10),
-        school: schoolEl.value,
-        text: text.slice(0, 140),
-        ts: todayStr(),
-        likes: 0,
-      };
-      (userComments[destId] = userComments[destId] || []).push(rec);
-      if (!writeJSON(C_KEY, userComments)) {
-        userComments[destId].pop();
-        say('留言没能存下：数据本身有问题，刷新后再试一次。', true);
-        return;
+      const btn = form.querySelector('.cmt-form__send');
+      btn.disabled = true;
+      say(cmOnline ? '落款中…' : '');
+
+      if (cmOnline) {
+        const res = await JHCloud.add(destId, text.slice(0, 140));
+        btn.disabled = false;
+        if (!res.ok) { say(res.error, true); return; }
+        const raw = Array.isArray(res.data) ? res.data[0] : res.data;
+        const row = remoteRow(raw || { id: Date.now(), dest_id: destId, name: me.name,
+          school: me.school, body: text.slice(0, 140), likes: 0, created_at: new Date().toISOString() });
+        row.mine = true;
+        row.liked = false;
+        cmRows.unshift(row);
+      } else {
+        const rec = {
+          cid: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+          name: me.name.slice(0, 10),
+          school: me.school,
+          text: text.slice(0, 140),
+          ts: todayStr(),
+          likes: 0,
+        };
+        (userComments[destId] = userComments[destId] || []).push(rec);
+        if (!writeJSON(C_KEY, userComments)) {
+          userComments[destId].pop();
+          btn.disabled = false;
+          say('留言没能存下：数据本身有问题，刷新后再试一次。', true);
+          return;
+        }
+        btn.disabled = false;
       }
-      commenter = { name: rec.name, school: rec.school };
-      writeJSON(CU_KEY, commenter);
 
       textEl.value = '';
       countEl.textContent = '0';
@@ -720,7 +975,7 @@
       cmtState.scope = 'all';
       syncCmtControls();
       renderCmtBoard();
-      say(store.volatile ? '已落款，仅此一窗。' : '已落款。');
+      say(cmOnline ? '已落款。' : (store.volatile ? '已落款，仅此一窗。' : '已落款，但只在本机。'));
       const listBox = $('#cmt-list');
       if (listBox) listBox.scrollIntoView({ block: 'nearest' });
     });
@@ -766,9 +1021,35 @@
       const go = e.target.closest('[data-goto-city]');
       if (go) { openDetail(go.dataset.gotoCity); return; }
 
+      // 举报：低权重入口，连点也只算一次（服务端按设备去重）
+      const rep = e.target.closest('[data-report]');
+      if (rep) {
+        if (!ident()) { openIdent(); return; }
+        if (!cmOnline) { $('#cmt-hint').textContent = '本机留言不必举报。'; return; }
+        rep.disabled = true;
+        JHCloud.report(rep.dataset.report).then((res) => {
+          rep.disabled = false;
+          $('#cmt-hint').textContent = res.ok ? '已报官，多谢。' : res.error;
+        });
+        return;
+      }
+
       const like = e.target.closest('.cc__like');
       if (like) {
-        const key = like.dataset.dest + ':' + like.dataset.like;
+        const cid = like.dataset.like;
+        const row = cmRows.find((c) => c.remote && c.cid === cid);
+        if (row) {
+          like.disabled = true;
+          JHCloud.like(cid).then((res) => {
+            like.disabled = false;
+            if (!res.ok) { $('#cmt-hint').textContent = res.error; return; }
+            row.liked = !!res.data.liked;
+            row.likes = res.data.likes;
+            renderCmtBoard();
+          });
+          return;
+        }
+        const key = like.dataset.dest + ':' + cid;
         const on = !like.classList.contains('is-on');
         if (on) likedMap[key] = 1; else delete likedMap[key];
         writeJSON(CL_KEY, likedMap);
@@ -787,6 +1068,16 @@
         const cid = del.dataset.del;
         if (cmtPendingDel === destId + ':' + cid) {
           cmtPendingDel = null;
+          const row = cmRows.find((c) => c.remote && c.cid === cid);
+          if (row) {
+            JHCloud.del(cid).then((res) => {
+              if (!res.ok) { $('#cmt-hint').textContent = res.error; return; }
+              cmRows = cmRows.filter((c) => c !== row);
+              $('#cmt-hint').textContent = '已删去。';
+              renderCmtBoard();
+            });
+            return;
+          }
           userComments[destId] = (userComments[destId] || []).filter((c) => c.cid !== cid);
           writeJSON(C_KEY, userComments);
           $('#cmt-hint').textContent = '已删去。';
@@ -819,9 +1110,11 @@
 
   /* ---------- 详情弹层 ---------- */
   let lastFocused = null;
+  let currentDetailId = null;
   function openDetail(id) {
     const d = DESTINATIONS.find((x) => x.id === id);
     if (!d) return;
+    currentDetailId = id;
     // 详情里再点开另一处时，不要把「返回焦点」记到旧画轴的关闭按钮上
     if ($('#modal').hidden) lastFocused = document.activeElement;
     const color = schoolColor(d.school);
@@ -847,8 +1140,8 @@
       </div>
       <div class="m-journey" role="group" aria-label="行旅印记">
         <span class="m-journey__label">行旅印记</span>
-        <button class="m-seal-btn m-seal-btn--done" type="button" data-mark="done" aria-pressed="false"><i>已</i><i>行</i></button>
-        <button class="m-seal-btn m-seal-btn--wish" type="button" data-mark="wish" aria-pressed="false"><i>愿</i><i>往</i></button>
+        <button class="m-seal-btn m-seal-btn--done" type="button" data-mark="done" data-sfx="seal" aria-pressed="false"><i>已</i><i>行</i></button>
+        <button class="m-seal-btn m-seal-btn--wish" type="button" data-mark="wish" data-sfx="seal" aria-pressed="false"><i>愿</i><i>往</i></button>
         <span class="m-journey__hint">落印记下 · 再点一次抹去</span>
       </div>
       <div class="m-body">
@@ -952,6 +1245,9 @@
 
   function unlockScroll() {
     if (!scrollLocked) return;
+    // 入籍弹层还开着就别解，否则底下的正文会跟着滚
+    const identBox = $('#ident');
+    if (identBox && !identBox.hidden) return;
     scrollLocked = false;
     const body = document.body;
     body.style.position = '';
@@ -973,6 +1269,7 @@
     const modal = $('#modal');
     if (modal.hidden) return;
     modal.hidden = true;
+    currentDetailId = null;
     unlockScroll();
     const back = lastFocused;
     lastFocused = null;
@@ -1575,8 +1872,11 @@
   bindRoutes();
   bindMaker();
   bindCmtBoard();
+  bindIdent();
   initCmtForm();
+  paintIdCard();
   initStats();
+  refreshComments();   // 异步：拿到云端留言后自己重绘
   paintBoard();
   if (currentView === 'cards') render();   // 深链 ?view=cards 才立刻建卡片
   renderMaker();

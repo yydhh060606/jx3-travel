@@ -12,6 +12,10 @@
 index.html          单页入口，四个视图（舆图 / 卡片 / 行程 / 留言）
 assets/
   style.css         全站样式（含夜间主题、响应式、打印与减弱动效降级）
+  audio.js          背景音与四类音效（手势解锁、静音开关、切后台暂停）
+  audio/            bgm.mp3（64 秒循环）+ tap / swish / seal / unseal
+  cloud.js          云服务访问层：入籍身份、留言读写、错误翻译
+  vendor/           @tencent-ai/workbuddy-cloud-sdk 的 IIFE 构建（自托管）
   data.js           20 个去处、20 个门派（含心法表）、9 条行程（含城际交通）、留言种子
   app.js            视图切换、收藏、行程编造、留言板、本地存储适配层
   map.js            舆图 SVG：疆域、点位、门派卡、双向联动
@@ -20,6 +24,7 @@ assets/
   img/              20 处实景（webp + jpg）
   fonts/            Noto Serif SC（400 正文 / 900 标题）、Ma Shan Zheng 子集
 _fonts/             字体子集化与 favicon 生成脚本（开发用，不参与构建）
+_tools/             图片压缩、音频合成脚本（开发用，不参与构建）
 _share/             分享卡源文件
 ```
 
@@ -41,10 +46,18 @@ python -m http.server 8000
 GitHub Pages，`main` 分支根目录直接发布，无 Actions、无产物目录。
 仓库根部的 `.nojekyll` 关闭 Jekyll 处理，避免下划线目录被忽略。
 
-在线地址：<https://yydhh060606.github.io/jx3-travel/>
+**两个在线地址，能力不同：**
+
+| 地址 | 留言 | 说明 |
+| --- | --- | --- |
+| <https://jx3-travel.app.workbuddy.host/> | 云端、人人可见 | 主站。云服务只放行这个域名 |
+| <https://yydhh060606.github.io/jx3-travel/> | 仅本机 | 镜像。域名没被云端授权，页面会显式提示 |
+
 仓库地址：<https://github.com/yydhh060606/jx3-travel>
 
-更新流程：改完直接推 `main`，Pages 会在 30–60 秒后自动重新发布。
+主站来自「WorkBuddy 应用发布」（`wbapp_02Jb2dmAj2rUzoUgdSOB9C`），
+与云数据库共用同一个应用身份；换域名会让登录失效，请不要另建应用。
+GitHub Pages 侧改完直接推 `main`，Pages 会在 30–60 秒后自动重新发布。
 
 ```bash
 git add -A && git commit -m "改了什么" && git push
@@ -74,11 +87,53 @@ git add -A && git commit -m "改了什么" && git push
 - 所有 `<img>` 带 `loading="lazy" decoding="async"`，WebP 失败时 `onerror` 回落到同名 JPG
 - 改图后重跑 `_tools/optimize-images.py` 重新压缩
 
+## 声音
+
+全部素材由 `_tools/make_audio.py` 合成，无第三方录音，无版权顾虑：
+
+| 文件 | 用途 | 规格 |
+| --- | --- | --- |
+| `bgm.mp3` | 全站背景音，64 秒无缝循环 | 古筝 + 箫 + 碰铃 + 低音散音，D 宫五声，64 kbps 单声道，500 KB |
+| `tap.mp3` | 按钮轻叩 | 0.16 s，2.4 KB |
+| `swish.mp3` | 视图切换（纸页翻动） | 0.55 s，7 KB |
+| `seal.mp3` | 收藏落印 | 0.62 s，7.7 KB |
+| `unseal.mp3` | 拆信封 | 0.95 s，11.6 KB |
+
+- 浏览器不允许无交互自动播放，所以等第一次点击 / 按键才起乐；点击音量淡入 1.6 s
+- 导航右侧「音 / 静」可随时关闭，选择存在 `jx3.sound.v1`，下次进来沿用
+- 切到后台自动暂停，切回来接着放；`prefers-reduced-motion` 下关掉提示呼吸动画
+- 想换曲子：替换 `assets/audio/bgm.mp3` 即可，代码只认这个路径
+
 ## 数据说明
 
-收藏、留言、自拟行程都存在浏览器 `localStorage`（键名 `jx3.*`），不上传、他人不可见。
-沙箱预览（如内嵌 iframe）会禁用本地存储，此时站点自动退回内存存储并在页面上说明，
-功能可用但刷新即清空。要多人共享需自建后端。
+分两套存储，按能力分工：
+
+**云端（留言）** —— 云数据库三张表 + 六个函数，前端拿不到表，只能调函数：
+
+| 对象 | 作用 |
+| --- | --- |
+| `jx3_comments` | 留言本体；RLS 打开且不建任何策略 = 只有服务端函数能读写 |
+| `jx3_likes` | 一人一条赞，(comment_id, device_hash) 主键天然去重 |
+| `jx3_reports` | 举报去重；满 4 条自动置 `hidden`，列表不再返回 |
+| `jx3_list_comments` | 读：公开可读，带 `mine` / `liked` 标记 |
+| `jx3_add_comment` | 写：校验长度、敏感词、同设备 20 秒一条 / 每天 30 条 |
+| `jx3_del_comment` | 删：比对设备密钥哈希，只删得掉自己那条 |
+| `jx3_toggle_like` | 赞 / 取消，返回最新计数 |
+| `jx3_report_comment` | 举报，按设备去重 |
+
+**本机（收藏、行程、身份、声音开关）** —— `localStorage`，键名 `jx3.*`。
+身份只存 `{ name, school, key }`，云端只收 `key` 的 sha256，不收明文。
+
+## 落籍（登录）
+
+没有密码，也不收手机号：名号 + 门派 + 一枚 32 位随机设备密钥。首次发言时弹出入籍面板，
+之后表单里的名号与门派锁定，删改只认这台设备。
+
+- 换浏览器 / 清缓存 = 换了个人，重新报一次即可，旧留言还在
+- 想升级成真账号（手机号验证码 / 微信扫码），在同一套表上把 `device_hash` 换成 `auth.uid()`
+  即可，`cloud.js` 之外不用改
+- 云端只放行 `https://jx3-travel.app.workbuddy.host` 与 `http://localhost:*`；
+  换到 GitHub Pages 打开会 403，页面退回本机留言并给出主站链接
 
 ### 门派心法
 

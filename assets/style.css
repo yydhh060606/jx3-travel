@@ -808,7 +808,32 @@ body.hero-far .hero__title-ink::after { animation-play-state: paused; }
   box-shadow: 0 4px 14px rgba(46, 59, 82, .3);
 }
 
+.viewswitch__side { display: flex; align-items: center; gap: 12px; }
 .weather { display: flex; gap: 9px; }
+
+/* 声音开关：与天气按钮同形，但用双环区分——它是"声音"不是"天气" */
+.wbtn--sound {
+  position: relative; font-size: 15px;
+  border-style: double; border-width: 3px;
+}
+.wbtn--sound::after {
+  content: ""; position: absolute; inset: 3px; border-radius: 50%;
+  border: 1px solid currentColor; opacity: .35; pointer-events: none;
+}
+.wbtn--sound:hover { transform: translateY(-2px); }
+/* 已静音：褪色 + 虚线，一眼看出关着 */
+.wbtn--sound.is-off {
+  color: var(--ink-dan); border-color: var(--ink-dan); border-style: dashed;
+  background: transparent; opacity: .78;
+}
+.wbtn--sound.is-off::after { opacity: 0; }
+/* 还没解锁（首次交互前）：轻轻呼吸一下，提示这里能出声 */
+.wbtn--sound.is-await { animation: sndAwait 2.6s ease-in-out infinite; }
+@keyframes sndAwait {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(178, 58, 38, 0); }
+  50% { box-shadow: 0 0 0 5px rgba(178, 58, 38, .10); }
+}
+
 .wbtn {
   width: 40px; height: 40px; border-radius: 50%;
   font-family: var(--font-kai); font-size: 17px; line-height: 1;
@@ -2156,6 +2181,100 @@ body.is-locked .modal { transition: none; }
 .cmt-form__send:active { transform: translateY(1px); }
 .cmt-note { margin: 14px 2px 0; font-size: 11.5px; line-height: 1.75; color: var(--ink-qing); }
 
+/* ---- 身份卡：落籍之后才好在簿子上落款 ---- */
+.idcard {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  margin: 0 0 14px; padding: 11px 13px; cursor: pointer; text-align: left;
+  background-color: var(--paper-card); background-image: var(--grain);
+  border: 1px solid var(--indigo-faint); border-radius: 2px;
+  transition: border-color .2s ease, transform .2s ease;
+}
+.idcard:hover { border-color: var(--indigo); transform: translateY(-1px); }
+.idcard__ava {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-kai); font-size: 16px; line-height: 1;
+  color: var(--paper-panel); background: var(--ink-dan);
+  transition: background .2s ease;
+}
+.idcard.is-on .idcard__ava { background: var(--seal); }
+.idcard__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.idcard__name {
+  font-family: var(--font-kai); font-size: 15px; letter-spacing: .08em;
+  color: var(--ink-nong); font-weight: 400;
+}
+.idcard__hint { font-style: normal; font-size: 11px; color: var(--ink-qing); letter-spacing: .04em; }
+
+/* 云端连不上时的说明条：不留白，也不装作正常 */
+.cmt-cloud {
+  display: none; margin: 0 0 14px; padding: 9px 12px;
+  font-size: 11.5px; line-height: 1.75; color: var(--ink-zhong);
+  border-left: 3px solid var(--seal); background: var(--seal-soft);
+}
+.cmt-cloud.is-on { display: block; }
+
+/* ---- 入籍弹层 ---- */
+.ident-panel { grid-template-columns: 1fr; width: min(432px, 92vw); }
+.ident { padding: 36px 32px 26px; }
+.ident__sub {
+  margin: 0; font-size: 10px; letter-spacing: .34em;
+  color: var(--ink-qing); text-transform: uppercase;
+}
+.ident__title {
+  margin: 8px 0 0; font-family: var(--font-brush); font-size: 30px;
+  letter-spacing: .18em; color: var(--indigo-deep); text-indent: .18em;
+}
+.ident__lede {
+  margin: 14px 0 22px; font-size: 12.5px; line-height: 1.95; color: var(--ink-dan);
+}
+.ident__field { display: block; margin-bottom: 15px; }
+.ident__field > span {
+  display: block; margin-bottom: 6px;
+  font-size: 11.5px; letter-spacing: .18em; color: var(--ink-dan);
+}
+.ident__field input, .ident__field select {
+  display: block; width: 100%; padding: 9px 11px;
+  background: var(--paper-panel); border: 1px solid var(--indigo-faint); border-radius: 2px;
+  font-family: inherit; font-size: 15px; line-height: 1.6; color: var(--ink-nong);
+  outline: none; transition: border-color .2s ease;
+}
+.ident__field input:focus, .ident__field select:focus { border-color: var(--indigo); }
+.ident__field input.is-err { border-color: var(--seal); background: var(--seal-soft); }
+.ident__err {
+  min-height: 18px; margin: 2px 0 8px;
+  font-size: 11.5px; color: var(--seal); letter-spacing: .03em;
+}
+.ident__acts { display: flex; gap: 10px; justify-content: flex-end; }
+.ident__cancel, .ident__ok {
+  padding: 8px 20px 9px; border-radius: 2px; cursor: pointer;
+  font-family: var(--font-kai); font-size: 15px; letter-spacing: .12em;
+  transition: .2s ease;
+}
+.ident__cancel { border: 1px solid var(--indigo-faint); background: transparent; color: var(--ink-dan); }
+.ident__cancel:hover { border-color: var(--indigo); color: var(--indigo); }
+.ident__ok { border: 1px solid var(--seal); background: var(--seal); color: #fdf7ef; }
+.ident__ok:hover { background: var(--indigo-deep); border-color: var(--indigo-deep); }
+.ident__ok:disabled { opacity: .55; cursor: default; }
+.ident__note {
+  margin: 16px 0 0; font-size: 11px; line-height: 1.8; color: var(--ink-qing);
+}
+
+/* ---- 举报：低权重，别和「赞」抢眼 ---- */
+.cc__report, .cm__report {
+  margin-left: auto; padding: 0 2px; border: 0; background: none;
+  font-family: inherit; font-size: 11px; letter-spacing: .04em;
+  color: var(--ink-qing); cursor: pointer; opacity: .7;
+  transition: color .2s ease, opacity .2s ease;
+}
+.cc__report:hover, .cm__report:hover { color: var(--seal); opacity: 1; }
+.cc__acts, .cm__acts { display: flex; align-items: center; gap: 10px; }
+
+/* 已落籍时表单里的名号/门派改为只读展示 */
+.cmt-field input:disabled, .cmt-field select:disabled {
+  color: var(--ink-dan); background: transparent; border-style: dashed;
+  cursor: default; opacity: 1;
+}
+
 /* ---- 工具条 ---- */
 .cmt-toolbar {
   display: flex; align-items: center; justify-content: space-between;
@@ -2305,6 +2424,7 @@ body.w-night .mk-pick__hint { color: var(--ink-dan); }
   .viewswitch { flex-direction: column; align-items: center; gap: 14px; }
   .viewswitch__group { flex-wrap: wrap; justify-content: center; }
   .vbtn { padding: 6px 16px 7px; font-size: 15.5px; letter-spacing: .1em; }
+  .viewswitch__side { gap: 14px; flex-wrap: wrap; justify-content: center; }
   .weather { justify-content: center; }
   .rt { grid-template-columns: 1fr; }
   .rt__no {
@@ -2363,6 +2483,7 @@ body.w-night .mk-pick__hint { color: var(--ink-dan); }
  * 无障碍：尊重减弱动效偏好
  * ========================================================================= */
 @media (prefers-reduced-motion: reduce) {
+  .wbtn--sound.is-await { animation: none; }
   *, *::before, *::after {
     animation-duration: .001ms !important;
     animation-delay: 0s !important;
