@@ -26,6 +26,14 @@
   font-display: swap;
   src: url("fonts/MaShanZheng.woff2") format("woff2");
 }
+/* 标题专用：同族 900 字重，只用在大字上（题名、分节标题），正文不碰 */
+@font-face {
+  font-family: "Noto Serif SC";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("fonts/NotoSerifSC-Heavy.woff2") format("woff2");
+}
 
 :root {
   /* ---------- 纸：暖白旧宣 ---------- */
@@ -87,6 +95,8 @@
   /* 毛笔：题名 / 城市 / 门派等展示级文字 */
   --font-brush: "STXingkai", "华文行楷", "Ma Shan Zheng", "Kaiti SC", "STKaiti", "KaiTi", serif;
   --font-serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  /* 宋体重磅：标题专用（900 字重子集），比行楷沉、比正文响 */
+  --font-title: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
   /* 楷：界面按钮、标签等需要清晰度的地方 */
   --font-kai:   "Kaiti SC", "STKaiti", "KaiTi", serif;
 
@@ -360,16 +370,34 @@ body.w-snow .ink-sun { opacity: .36; filter: blur(3px) saturate(.55); }
   margin: 0; font-weight: 400;
   opacity: 0; animation: fadeInDown .9s ease .2s both;
 }
+/* --- 题名：宋体 900 打底 ---
+ * 大字要的是「压得住」：900 字重的宋体笔画厚、横细竖粗有骨，1440 宽下不会被背景吃掉。
+ * 副标题仍是毛笔体（--font-brush），一重一轻形成对比。
+ * 想回到行楷狂墨（侧掠 + 渗墨 + 飞白）：<html class="title-ink">，见下一条规则。
+ */
 .hero__title-ink {
   display: inline-block;
-  font-family: var(--font-wild);
-  font-size: clamp(54px, 10.5vw, 104px);
+  font-family: var(--font-title);
+  font-weight: 900;
+  font-size: clamp(46px, 8.6vw, 90px);
   line-height: 1.06;
-  letter-spacing: -.015em;
+  letter-spacing: .12em;
+  text-indent: .12em;      /* 抵消尾字后的字距，视觉上仍居中 */
   color: var(--indigo-deep);
+  transform: rotate(-.8deg);
+  transform-origin: 50% 78%;
+  text-shadow: .035em .035em 0 rgba(46, 59, 82, .13);
+}
+
+/* 备选：行楷狂墨（原版） */
+.title-ink .hero__title-ink {
+  font-family: var(--font-wild);
+  font-weight: 400;
+  font-size: clamp(54px, 10.5vw, 104px);
+  letter-spacing: -.015em;
+  text-indent: 0;
   /* 侧掠：整体前倾，带出攻击性 */
   transform: skewX(-6.5deg) rotate(-1.1deg) scaleY(1.1);
-  transform-origin: 50% 78%;
   /* 加锋：描边垫在字面之下，只加粗不改形 */
   -webkit-text-stroke: 1.4px var(--indigo-deep);
   paint-order: stroke fill;
@@ -839,14 +867,27 @@ body.hero-far .hero__title-ink::after { animation-play-state: paused; }
 .atlas__title { margin: 0; font-weight: 400; }
 .atlas__title-ink {
   display: inline-block;
-  font-family: var(--font-wild);
-  font-size: clamp(34px, 4.2vw, 54px); line-height: 1.06; letter-spacing: .03em;
+  font-family: var(--font-title);
+  font-weight: 900;
+  font-size: clamp(32px, 3.8vw, 48px); line-height: 1.06; letter-spacing: .14em;
+  text-indent: .14em;
   color: var(--indigo-deep);
-  transform: skewX(-6.5deg) rotate(-1.2deg) scaleY(1.06);
+  transform: rotate(-.6deg);
   transform-origin: 50% 78%;
+  text-shadow: .03em .03em 0 rgba(46, 59, 82, .12);
+}
+/* 与首屏题名同一开关：<html class="title-ink"> 时回到行楷狂墨 */
+.title-ink .atlas__title-ink {
+  font-family: var(--font-wild);
+  font-weight: 400;
+  font-size: clamp(34px, 4.2vw, 54px);
+  letter-spacing: .03em;
+  text-indent: 0;
+  transform: skewX(-6.5deg) rotate(-1.2deg) scaleY(1.06);
   -webkit-text-stroke: .9px var(--indigo-deep);
   paint-order: stroke fill;
   filter: url(#wildInk);
+  text-shadow: none;
 }
 .atlas__sub {
   margin: 10px 0 0; font-family: var(--font-kai);
@@ -1146,22 +1187,23 @@ body.hero-far .hero__title-ink::after { animation-play-state: paused; }
 .fgroup--journey .fgroup__label { color: var(--seal); opacity: .92; }
 .fgroup--journey .chip[aria-pressed="true"] { background: var(--seal); border-color: var(--seal); }
 
-/* 卡片角上的印记：歪一点，像手盖的 */
+/* 卡片角上的印记：歪一点，像手盖的（放大了些，盖得住，也更像个记号） */
 .card__mark {
-  position: absolute; z-index: 3; right: 10px; top: 47px;
-  width: 30px; height: 30px; border-radius: 2px;
+  position: absolute; z-index: 3; right: 10px; top: 46px;
+  width: 46px; height: 46px; border-radius: 2px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-family: var(--font-kai); font-size: 10.5px; line-height: 1.1;
+  font-family: var(--font-kai); font-size: 15px; line-height: 1.14; letter-spacing: .02em;
   pointer-events: none; user-select: none;
 }
 .card__mark i { font-style: normal; display: block; }
 .card__mark--done {
   color: #fdf7ef; background: var(--seal); transform: rotate(-6deg);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .3), 0 2px 9px rgba(20, 30, 40, .44);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .34), inset 0 0 0 3px rgba(255, 255, 255, .1),
+    0 3px 12px rgba(20, 30, 40, .48);
 }
 .card__mark--wish {
-  color: #f6f1e5; background: rgba(46, 59, 82, .44); transform: rotate(4deg);
-  box-shadow: inset 0 0 0 1px rgba(246, 241, 229, .72);
+  color: #f6f1e5; background: rgba(46, 59, 82, .46); transform: rotate(4deg);
+  box-shadow: inset 0 0 0 1px rgba(246, 241, 229, .78), inset 0 0 0 3px rgba(246, 241, 229, .12);
 }
 
 /* 卡片区进度 */
@@ -1244,6 +1286,12 @@ body.hero-far .hero__title-ink::after { animation-play-state: paused; }
   background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 62%, var(--indigo-deep)) 0%,
     color-mix(in srgb, var(--accent) 30%, var(--jade-deep)) 100%);
   border: 1px solid var(--indigo-faint);
+}
+/* 裱边顶上一道朱线：像信笺的界栏，压住照片的冷 */
+.card__media::before {
+  content: ""; position: absolute; z-index: 3; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, var(--seal) 0%, var(--seal) 72%, transparent 100%);
+  opacity: .88; pointer-events: none;
 }
 .card__media::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -1470,6 +1518,26 @@ body.hero-far .hero__title-ink::after { animation-play-state: paused; }
   background: var(--seal); transform: rotate(45deg) scale(.72);
 }
 .m-section p { margin: 0; font-size: 15px; color: var(--ink-zhong); line-height: 1.78; }
+
+/* 门派心法：定位属于心法，一门门派可以有两门（明教 焚影圣诀 / 明尊琉璃体） */
+.m-chi__list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.m-chi__list li {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 10px 6px; background: var(--paper-2);
+  border: 1px solid var(--line); border-left: 2px solid var(--seal-soft);
+}
+.m-chi__list b {
+  font-family: var(--font-kai); font-weight: 400; font-size: 15px;
+  letter-spacing: .06em; color: var(--indigo-deep);
+}
+.m-chi__role {
+  font-style: normal; font-size: 11px; letter-spacing: .06em;
+  padding: 1px 6px 2px; border-radius: 2px;
+  color: var(--paper-panel); background: var(--indigo-soft);
+}
+.m-chi__role[data-role="治疗"] { background: #4f8a6b; }
+.m-chi__role[data-role="铁卫"] { background: #5a6b73; }
+.m-section p.m-chi__tag { margin: 10px 0 0; font-size: 13px; letter-spacing: .08em; color: var(--ink-dan); }
 .m-spots { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 7px; }
 .m-spots li { font-size: 14px; color: var(--ink-nong); padding-left: 19px; position: relative; }
 .m-spots li::before {
@@ -1841,6 +1909,17 @@ body.is-locked .modal { transition: none; }
 .rt__city em { font-style: normal; font-size: 11px; color: var(--ink-dan); letter-spacing: .04em; }
 .rt__arrow { color: var(--ink-qing); font-size: 15px; padding: 0 2px; }
 
+/* 两城之间的一段交通：车次种类 / 时长 / 票价，竖排三行，不抢城市卡片的视线 */
+.rt__move {
+  display: inline-flex; flex-direction: column; align-items: center;
+  gap: 1px; margin: 0 1px; padding: 4px 8px 5px;
+  background: var(--indigo-wash); border-radius: 2px;
+  line-height: 1.28; white-space: nowrap; cursor: help;
+}
+.rt__move__m { font-style: normal; font-size: 10.5px; letter-spacing: .12em; color: var(--indigo); }
+.rt__move__t { font-weight: 400; font-size: 11.5px; color: var(--ink-dan); }
+.rt__move__c { text-decoration: none; font-size: 11px; color: var(--seal); }
+
 .rt__toggle {
   position: absolute; top: 24px; right: 28px;
   display: inline-flex; align-items: center; gap: 9px;
@@ -1907,7 +1986,7 @@ body.is-locked .modal { transition: none; }
 }
 
 /* =========================================================================
- * 同门留言：详情弹层内的留言区
+ * 侠客留言：详情弹层内的留言区
  * ========================================================================= */
 .m-comments { margin-top: 4px; }
 .m-section--cm { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line-soft); }

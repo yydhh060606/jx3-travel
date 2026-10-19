@@ -111,8 +111,15 @@
   function schoolColor(name) {
     return (SCHOOLS[name] && SCHOOLS[name].color) || '#6b4a8a';
   }
+  // 定位：主定位给卡片小签，全部定位给筛选（明教这类双心法门派两职都算）
   function schoolRole(name) {
-    return (SCHOOLS[name] && SCHOOLS[name].role) || '';
+    return ROLE_OF(name);
+  }
+  function schoolRoles(name) {
+    return ROLES_OF(name);
+  }
+  function schoolChi(name) {
+    return (SCHOOLS[name] && SCHOOLS[name].chi) || [];
   }
   // small=true 取 160px 缩略（卡片上只有 52px，不必下整张立绘）
   function schoolPortrait(name, small) {
@@ -139,8 +146,9 @@
     filters.innerHTML = GROUPS.map((g) => {
       const counts = {};
       DESTINATIONS.forEach((d) => {
-        const key = g.key === 'role' ? schoolRole(d.school) : d[g.field];
-        if (key) counts[key] = (counts[key] || 0) + 1;
+        // 定位按「可担任的定位」计数：一间门派有两门心法时，两种定位各算一次
+        const keys = g.key === 'role' ? schoolRoles(d.school) : [d[g.field]];
+        keys.forEach((key) => { if (key) counts[key] = (counts[key] || 0) + 1; });
       });
       let values = g.order ? g.order : Object.keys(counts);
       values = ['全部', ...values];
@@ -183,7 +191,7 @@
     const q = state.q.trim().toLowerCase();
     return DESTINATIONS.filter((d) => {
       if (state.region !== '全部' && d.region !== state.region) return false;
-      if (state.role !== '全部' && schoolRole(d.school) !== state.role) return false;
+      if (state.role !== '全部' && schoolRoles(d.school).indexOf(state.role) === -1) return false;
       if (state.school !== '全部' && d.school !== state.school) return false;
       if (state.journey === '已行' && !journey.done.has(d.id)) return false;
       if (state.journey === '愿往' && !journey.wish.has(d.id)) return false;
@@ -265,7 +273,7 @@
           ${portrait ? `<img class="card__ava" src="${portrait}" alt="${escapeHTML(d.school)}立绘" loading="lazy" decoding="async"
                onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('-sm.webp','.jpg');}else{this.remove();}">` : ''}
           <span class="card__school">${escapeHTML(d.school)}</span>
-          <span class="card__role">${escapeHTML(schoolRole(d.school))}</span>
+          <span class="card__role" title="心法：${escapeHTML(schoolChi(d.school).map(([n, r]) => n + '（' + r + '）').join(' · '))}">${escapeHTML(schoolRoles(d.school).join('·'))}</span>
           ${markHTML(d.id)}
           <span class="card__schoolname">${escapeHTML(d.school)}</span>
         </div>
@@ -283,7 +291,7 @@
       </article>`;
   }
 
-  /* ---------- 同门留言（纯本地：只存在这台设备的 localStorage） ---------- */
+  /* ---------- 侠客留言（纯本地：只存在这台设备的 localStorage） ---------- */
   const C_KEY = 'jx3.comments.v1';      // { destId: [ {cid,name,school,text,ts,likes} ] }
   const CU_KEY = 'jx3.commenter.v1';    // { name, school } 记住上次落款
   const CL_KEY = 'jx3.likes.v1';        // { 'destId:cid': 1 }
@@ -364,7 +372,7 @@
       : '<li class="cm-empty">这一处还没有人留言，来做第一个。</li>';
     return `
       <div class="m-section m-section--cm">
-        <h3>同门留言<span class="cm__count">${list.length}</span></h3>
+        <h3>侠客留言<span class="cm__count">${list.length}</span></h3>
         <form class="cm-form" id="cm-form" novalidate>
           <div class="cm-form__row">
             <input class="cm-form__name" name="name" type="text" maxlength="10" autocomplete="nickname"
@@ -835,7 +843,7 @@
         ${portrait ? '' : '<span class="m-seal">' + escapeHTML(d.mark) + '</span>'}
         <h2 class="m-head__city" id="m-city">${escapeHTML(d.city)}</h2>
         <p class="m-head__sub">${escapeHTML(d.alias)} · ${escapeHTML(d.province)} · ${escapeHTML(d.region)} · ${escapeHTML(d.era)}</p>
-        <span class="m-head__school">${escapeHTML(d.school)}<span class="r">${escapeHTML(schoolRole(d.school))}</span></span>
+        <span class="m-head__school">${escapeHTML(d.school)}<span class="r">${escapeHTML(schoolRoles(d.school).join('/'))}</span></span>
       </div>
       <div class="m-journey" role="group" aria-label="行旅印记">
         <span class="m-journey__label">行旅印记</span>
@@ -844,6 +852,14 @@
         <span class="m-journey__hint">落印记下 · 再点一次抹去</span>
       </div>
       <div class="m-body">
+        <div class="m-section m-chi">
+          <h3>门派心法</h3>
+          <ul class="m-chi__list">
+            ${schoolChi(d.school).map(([n, r]) => `
+              <li><b>${escapeHTML(n)}</b><em class="m-chi__role" data-role="${escapeHTML(r)}">${escapeHTML(r)}</em></li>`).join('')}
+          </ul>
+          <p class="m-chi__tag">${escapeHTML((SCHOOLS[d.school] && SCHOOLS[d.school].tag) || '')}</p>
+        </div>
         <div class="m-section">
           <h3>门派渊源</h3>
           <p>${escapeHTML(d.origin)}</p>
@@ -1057,14 +1073,26 @@
     </li>`;
   }
 
+  // 两城之间的一段交通：怎么去、要多久、多少钱
+  function moveHTML(m) {
+    const tip = `交通：${m.mode} 约 ${m.time} · ${m.cost}${m.note ? '（' + m.note + '）' : ''}`;
+    return `<span class="rt__move" title="${escapeHTML(tip)}">
+      <i class="rt__move__m">${escapeHTML(m.mode)}</i>
+      <b class="rt__move__t">${escapeHTML(m.time)}</b>
+      <s class="rt__move__c">${escapeHTML(m.cost)}</s>
+    </span>`;
+  }
+
   function routeHTML(r) {
     const open = routeState.open.has(r.id);
     const mine = !!r.mine;
+    const moves = r.moves || [];
     const chain = r.cities.map((cid, i) => {
       const d = DEST_BY_ID[cid];
       if (!d) return '';
       const arrow = i ? '<span class="rt__arrow" aria-hidden="true">›</span>' : '';
-      return `${arrow}<button class="rt__city" type="button" data-city="${cid}" title="看 ${escapeHTML(d.city)} 的详情">
+      const mv = i > 0 && moves[i - 1] ? moveHTML(moves[i - 1]) : '';
+      return `${arrow}${mv}<button class="rt__city" type="button" data-city="${cid}" title="看 ${escapeHTML(d.city)} 的详情">
         <i class="rt__mark" style="--c:${schoolColor(d.school)}">${escapeHTML(d.mark)}</i>
         <b>${escapeHTML(d.city)}</b>
         <em>${escapeHTML(d.school)}</em>

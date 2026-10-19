@@ -26,8 +26,18 @@ SOURCES = {
                  "files/ma-shan-zheng-chinese-simplified-400-normal.woff2",
     "nssc.woff2": "https://unpkg.com/@fontsource/noto-serif-sc@5/"
                   "files/noto-serif-sc-chinese-simplified-400-normal.woff2",
+    # 标题用黑体级的宋：900 字重做「醒目」的标题，正文仍用 400
+    "nssc900.woff2": "https://unpkg.com/@fontsource/noto-serif-sc@5/"
+                     "files/noto-serif-sc-chinese-simplified-900-normal.woff2",
 }
-JOBS = [("msz.woff2", "MaShanZheng.woff2"), ("nssc.woff2", "NotoSerifSC.woff2")]
+# (源, 产物, 专用字表文件)；字表为 None 时用整站字表
+JOBS = [
+    ("msz.woff2", "MaShanZheng.woff2", None),
+    ("nssc.woff2", "NotoSerifSC.woff2", None),
+    # 900 只服务题名（首屏与图鉴都是「江湖行纪」四字），单出一份极小子集，别让首页多背 250KB
+    ("nssc900.woff2", "NotoSerifSC-Heavy.woff2", "title.txt"),
+]
+TITLE_CHARS = "江湖行纪"
 
 FILES = ["assets/data.js", "index.html", "assets/app.js", "assets/map.js",
          "assets/letter.js", "assets/weather.js"]
@@ -79,11 +89,15 @@ def main():
         fh.write("".join(sorted(chars)))
 
     pyft = os.path.join(os.path.dirname(sys.executable), "pyftsubset.exe")
-    for src, dst in JOBS:
+    titlefile = os.path.join(SRC, "title.txt")
+    with open(titlefile, "w", encoding="utf-8") as fh:
+        fh.write(TITLE_CHARS)
+
+    for src, dst, own_chars in JOBS:
         s = ensure_source(src)
         o = os.path.join(OUT, dst)
         r = subprocess.run([pyft, s, "--output-file=" + o, "--flavor=woff2",
-                            "--text-file=" + charfile,
+                            "--text-file=" + (os.path.join(SRC, own_chars) if own_chars else charfile),
                             # --text-file 会把全角空格当空白丢掉，单独补回来
                             "--unicodes=U+3000",
                             "--layout-features=kern,liga,clig,calt,locl,vert,vrt2",
