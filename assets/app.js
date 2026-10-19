@@ -437,9 +437,164 @@
       likes: r.likes || 0,
       mine: !!r.mine,
       liked: !!r.liked,
+      // 楼中楼与 @：父留言 id、回的是谁、提到了谁
+      parentId: r.parent_id ? String(r.parent_id) : null,
+      replyTo: r.reply_to || '',
+      mentions: Array.isArray(r.mentions) ? r.mentions.slice() : [],
       remote: true
     };
   }
+
+  /* ---------- 楼中楼 / @ 提及：两边（详情与留言板）共用 ---------- */
+  // 回复态：正在回谁；null 表示写新的一条
+  let replyTo = null;
+  // 「@我」的已读时间点，存在本机，换设备就重新算
+  const SEEN_KEY = 'jx3.mentions.seen';
+  let seenAt = store.read(SEEN_KEY) || '';
+
+  function samePerson(a, b) { return !!a && !!b && a === b; }
+
+  // 在场的人：从当前可见的留言里取名号，供 @ 选择与正文识别
+  function namePool(rows) {
+    const seen = new Set();
+    const out = [];
+    (rows || []).forEach((c) => {
+      if (!c.name || seen.has(c.name)) return;
+      seen.add(c.name);
+      out.push(c.name);
+    });
+    return out;
+  }
+
+  // 正文里出现了 @某某 就算提到了他（名号最长十个字，直接做子串匹配）
+  function mentionsIn(text, pool, me) {
+    const out = [];
+    pool.forEach((n) => {
+      if (out.length >= 5 || !n) return;
+      if (me && samePerson(n, me.name)) return;
+      if (text.indexOf('@' + n) >= 0) out.push(n);
+    });
+    return out;
+  }
+
+  // 把一层平铺的留言折成「父 + 子」，父留言被删的子条自己升为顶层
+  function threadOf(list) {
+    const byId = new Map();
+    list.forEach((c) => byId.set(c.cid, c));
+    const tops = [];
+    const kids = new Map();
+    list.forEach((c) => {
+      if (c.parentId && byId.has(c.parentId)) {
+        const arr = kids.get(c.parentId) || [];
+        arr.push(c);
+        kids.set(c.parentId, arr);
+      } else {
+        tops.push(c);
+      }
+    });
+    tops.forEach((t) => {
+      const k = kids.get(t.cid);
+      // 每轮都重设，否则删掉回复后旧的 kids 还挂在行上
+      t.kids = k ? k.slice().reverse() : null;   // 入参是倒序，楼内按时间正序读
+    });
+    return tops;
+  }
+
+  function insertAtCursor(el, text) {
+    const s = typeof el.selectionStart === 'number' ? el.selectionStart : el.value.length;
+    const e = typeof el.selectionEnd === 'number' ? el.selectionEnd : s;
+    el.value = el.value.slice(0, s) + text + el.value.slice(e);
+    el.selectionStart = el.selectionEnd = s + text.length;
+    el.focus();
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // 浮层：选一位在场的人 @
+  let atPickBox = null;
+  function closeAtPick() {
+    if (atPickBox) { atPickBox.remove(); atPickBox = null; }
+  }
+  function openAtPick(anchor, pool, me, onPick) {
+    closeAtPick();
+    const names = pool.filter((n) => !me || !samePerson(n, me.name)).slice(0, 8);
+    const box = document.createElement('div');
+    box.className = 'atpick';
+    box.setAttribute('role', 'listbox');
+    box.innerHTML = names.length
+      ? names.map((n) => `<button class="atpick__i" type="button" role="option">${escapeHTML(n)}</button>`).join('')
+      : '<p class="atpick__empty">这会儿还没有别人说过话，先等一等。</p>';
+    document.body.appendChild(box);
+    const r = anchor.getBoundingClientRect();
+    const w = 168;
+    box.style.left = Math.max(8, Math.min(r.left - 4, window.innerWidth - w - 8)) + 'px';
+    box.style.top = Math.min(r.bottom + 6, window.innerHeight - 8 - box.offsetHeight) + 'px';
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('.atpick__i');
+      if (!b) return;
+      onPick(b.textContent.trim());
+      closeAtPick();
+    });
+    atPickBox = box;
+    if (window.Sound) Sound.sfx('tap');
+  }
+  document.addEventListener('click', (e) => {
+    if (atPickBox && !e.target.closest('.atpick') && !e.target.closest('[data-at]')) closeAtPick();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAtPick(); });
+
+  // 回复条：两个编辑框各有一处，切换时同步
+  function paintReplyBar() {
+    document.querySelectorAll('[data-reply-bar]').forEach((bar) => {
+      if (!replyTo) { bar.hidden = true; bar.innerHTML = ''; return; }
+      bar.hidden = false;
+      bar.innerHTML = `<span class="replybar__txt">回复 <b>${escapeHTML(replyTo.name)}</b></span>
+        <button class="replybar__x" type="button" data-reply-cancel aria-label="取消回复">取消</button>`;
+    });
+    // 占位文字跟着变，免得忘了自己在回谁
+    const dt = $('#cm-form .cm-form__text');
+    const bt = $('#cmt-text');
+    [[dt, '说说这处地方 —— 路怎么走、什么时候去、值不值得。'],
+     [bt, '路怎么走、什么时候去、值不值得……']].forEach(([el, ph]) => {
+      if (el) el.placeholder = replyTo ? '回 ' + replyTo.name + '：' : ph;
+    });
+  }
+
+  function startReply(t) {
+    replyTo = t;
+    paintReplyBar();
+    const el = t.from === 'detail' ? $('#cm-form .cm-form__text') : $('#cmt-text');
+    if (el) {
+      el.focus();
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
+  function clearReply() { replyTo = null; paintReplyBar(); }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-reply-cancel]')) return;
+    clearReply();
+  });
+
+  // 未读：@我 且没看过的条数
+  function myMentions(rows, me) {
+    if (!me) return [];
+    return (rows || []).filter((c) => !c.mine && (c.mentions || []).some((n) => samePerson(n, me.name)));
+  }
+  function unseenMentions() {
+    const me = ident();
+    if (!me) return 0;
+    const since = seenAt ? Date.parse(seenAt) : 0;
+    return myMentions(allComments(), me).filter((c) => {
+      const t = Date.parse(c.ts);
+      return !isNaN(t) && t > (isNaN(since) ? 0 : since);
+    }).length;
+  }
+  function markMentionsSeen() {
+    seenAt = new Date().toISOString();
+    store.write(SEEN_KEY, seenAt);
+  }
+
 
   // 云端只认一个域名（发布域名），换到别的地址打开就只剩本机留言
   const CANON = 'https://jx3-travel.app.workbuddy.host/';
@@ -524,12 +679,25 @@
     )).join('');
   }
 
-  function commentHTML(c, id) {
+  // 正文里的 @名号 单独着色，别让人以为是一串普通文字
+  function linkMentions(text, mentions) {
+    let html = escapeHTML(text);
+    (mentions || []).slice().sort((a, b) => b.length - a.length).forEach((n) => {
+      const token = escapeHTML('@' + n);
+      html = html.split(token).join(`<b class="cm__mention">${token}</b>`);
+    });
+    return html;
+  }
+
+  function commentHTML(c, id, isKid, kidsHTML) {
     const key = id + ':' + c.cid;
     const on = c.remote ? !!c.liked : !!likedMap[key];
     const n = c.remote ? (c.likes || 0) : (c.likes || 0) + (on ? 1 : 0);
+    const to = c.replyTo
+      ? `<span class="cm__to">回 ${escapeHTML(c.replyTo)}</span>`
+      : '';
     return `
-      <li class="cm${c.mine ? ' cm--mine' : ''}" data-cid="${escapeHTML(c.cid)}">
+      <li class="cm${c.mine ? ' cm--mine' : ''}${isKid ? ' cm--kid' : ''}" data-cid="${escapeHTML(c.cid)}">
         <span class="cm__ava" style="--c:${schoolColor(c.school)}" aria-hidden="true">${escapeHTML(String(c.school).slice(0, 1))}</span>
         <div class="cm__body">
           <p class="cm__top">
@@ -537,26 +705,37 @@
             <span class="cm__school">${escapeHTML(c.school)}</span>
             <time class="cm__time" datetime="${escapeHTML(c.ts)}">${escapeHTML(relTime(c.ts))}</time>
           </p>
-          <p class="cm__text">${escapeHTML(c.text)}</p>
+          <p class="cm__text">${to}${linkMentions(c.text, c.mentions)}</p>
           <p class="cm__acts">
             <button class="cm__like${on ? ' is-on' : ''}" type="button" data-like="${escapeHTML(c.cid)}" data-base="${c.likes || 0}" aria-pressed="${on}" aria-label="赞同这条留言">赞 <b>${n}</b></button>
+            <button class="cm__reply" type="button" data-reply="${escapeHTML(c.cid)}"
+              data-name="${escapeHTML(c.name)}" data-dest="${escapeHTML(id)}">回复</button>
             <button class="cm__del" type="button" data-del="${escapeHTML(c.cid)}"${c.mine ? '' : ' hidden'}>删去</button>
             <button class="cm__report" type="button" data-report="${escapeHTML(c.cid)}" title="举报这条留言">举报</button>
           </p>
+          ${kidsHTML ? `<ul class="cm__replies">${kidsHTML}</ul>` : ''}
         </div>
       </li>`;
+  }
+
+  // 一层折成「父 + 楼内回复」，回复只排一层，回回复也挂在同一楼里
+  function threadHTML(list, id) {
+    return threadOf(list).map((t) => commentHTML(t, id, false,
+      t.kids ? t.kids.map((k) => commentHTML(k, id, true, '')).join('') : ''
+    )).join('');
   }
 
   function commentsHTML(id) {
     const list = listComments(id);
     const me = ident();
     const items = list.length
-      ? list.map((c) => commentHTML(c, id)).join('')
+      ? threadHTML(list, id)
       : '<li class="cm-empty">这一处还没有人留言，来做第一个。</li>';
     return `
       <div class="m-section m-section--cm">
         <h3>侠客留言<span class="cm__count">${list.length}</span></h3>
         <form class="cm-form" id="cm-form" novalidate>
+          <div class="replybar" data-reply-bar hidden></div>
           <div class="cm-form__row">
             <input class="cm-form__name" name="name" type="text" maxlength="10" autocomplete="nickname"
                    placeholder="你的江湖名号" aria-label="昵称"
@@ -566,13 +745,14 @@
           <textarea class="cm-form__text" name="text" rows="2" maxlength="140"
                     placeholder="说说这处地方 —— 路怎么走、什么时候去、值不值得。" aria-label="留言内容"></textarea>
           <div class="cm-form__foot">
+            <button class="cm-form__at" type="button" data-at aria-label="提到某人">@</button>
             <span class="cm-form__count"><b>0</b>/140</span>
             <span class="cm-form__hint" role="status" aria-live="polite"></span>
             <button class="cm-form__send" type="submit">落　款</button>
           </div>
         </form>
         <ul class="cm-list" id="cm-list">${items}</ul>
-        <p class="cm-note">留言写在云端，人人都看得见；删去只认你这台设备。</p>
+        <p class="cm-note">留言写在云端，人人都看得见；删去只认你这台设备。点「回复」可以接在某一条下面，正文里写 @名号 会提醒对方。</p>
       </div>`;
   }
 
@@ -582,7 +762,7 @@
     if (!ul) return;
     const list = listComments(id);
     ul.innerHTML = list.length
-      ? list.map((c) => commentHTML(c, id)).join('')
+      ? threadHTML(list, id)
       : '<li class="cm-empty">这一处还没有人留言，来做第一个。</li>';
     const cnt = $('.m-section--cm .cm__count');
     if (cnt) cnt.textContent = list.length;
@@ -624,14 +804,22 @@
       const btn = form.querySelector('.cm-form__send');
       btn.disabled = true;
 
+      const tgt = replyTo && replyTo.from === 'detail' ? replyTo : null;
+      const ments = mentionsIn(text, namePool(listComments(id)), me);
+
       if (cmOnline) {
-        const res = await JHCloud.add(id, text.slice(0, 140));
+        const res = await JHCloud.add(id, text.slice(0, 140), {
+          parentId: tgt && tgt.cid, mentions: ments
+        });
         btn.disabled = false;
         if (!res.ok) { say(res.error, true); return; }
         const raw = Array.isArray(res.data) ? res.data[0] : res.data;
         const row = remoteRow(raw);
         row.mine = true;
         row.liked = false;
+        row.parentId = tgt ? String(tgt.cid) : null;
+        row.replyTo = tgt ? tgt.name : '';
+        row.mentions = ments;
         cmRows.unshift(row);
       } else {
         const rec = {
@@ -641,6 +829,9 @@
           text: text.slice(0, 140),
           ts: todayStr(),
           likes: 0,
+          parentId: tgt ? String(tgt.cid) : null,
+          replyTo: tgt ? tgt.name : '',
+          mentions: ments,
         };
         (userComments[id] = userComments[id] || []).push(rec);
         if (!writeJSON(C_KEY, userComments)) {
@@ -654,6 +845,7 @@
 
       textEl.value = '';
       countEl.textContent = '0';
+      clearReply();
       repaintComments(id);
       say(cmOnline ? '已落款。' : (store.volatile ? '已落款，仅此一窗。' : '已落款，但只在本机。'));
       // 让新留言出现在视野里
@@ -661,8 +853,21 @@
       if (first) first.scrollIntoView({ block: 'nearest' });
     });
 
-    // 赞 / 删 / 举报：事件委托，重绘列表后依然有效
+    // 赞 / 删 / 举报 / 回复 / @：事件委托，重绘列表后依然有效
     box.addEventListener('click', (e) => {
+      const atBtn = e.target.closest('[data-at]');
+      if (atBtn) {
+        openAtPick(atBtn, namePool(listComments(id)), ident(),
+          (n) => insertAtCursor(textEl, '@' + n + ' '));
+        return;
+      }
+
+      const rbtn = e.target.closest('[data-reply]');
+      if (rbtn) {
+        startReply({ cid: rbtn.dataset.reply, name: rbtn.dataset.name, destId: id, from: 'detail' });
+        return;
+      }
+
       const rep = e.target.closest('[data-report]');
       if (rep) {
         if (!ident()) { openIdent(); return; }
@@ -801,7 +1006,7 @@
     return out.join('');
   }
 
-  function cmtCardHTML(c) {
+  function cmtCardHTML(c, isKid, kidsHTML) {
     const key = c.destId + ':' + c.cid;
     const on = c.remote ? !!c.liked : !!likedMap[key];
     const dest = DEST_BY_ID[c.destId];
@@ -809,8 +1014,11 @@
       ? `<button class="cc__at" type="button" data-goto-city="${escapeHTML(c.destId)}"
            title="看${escapeHTML(dest.city)}的详情">${escapeHTML(dest.city)}</button>`
       : '<span class="cc__at cc__at--all">全书</span>';
+    const to = c.replyTo ? `<span class="cc__to">回 ${escapeHTML(c.replyTo)}</span>` : '';
+    const me = ident();
+    const atMe = me && !c.mine && (c.mentions || []).some((n) => samePerson(n, me.name));
     return `
-      <li class="cc${c.mine ? ' cc--mine' : ''}" data-dest="${escapeHTML(c.destId)}" data-cid="${escapeHTML(c.cid)}"
+      <li class="cc${c.mine ? ' cc--mine' : ''}${isKid ? ' cc--kid' : ''}${atMe ? ' cc--atme' : ''}" data-dest="${escapeHTML(c.destId)}" data-cid="${escapeHTML(c.cid)}"
           style="--c:${schoolColor(c.school)}">
         <span class="cc__ava" aria-hidden="true">${escapeHTML(String(c.school).slice(0, 1))}</span>
         <div class="cc__body">
@@ -818,20 +1026,30 @@
             <b class="cc__name">${escapeHTML(c.name)}</b>
             <span class="cc__school">${escapeHTML(c.school)}</span>
             ${at}
+            ${atMe ? '<span class="cc__flag">@你</span>' : ''}
             <time class="cc__time" datetime="${escapeHTML(c.ts)}">${escapeHTML(relTime(c.ts))}</time>
           </p>
-          <p class="cc__text">${escapeHTML(c.text)}</p>
+          <p class="cc__text">${to}${linkMentions(c.text, c.mentions)}</p>
           <p class="cc__acts">
             <button class="cc__like${on ? ' is-on' : ''}" type="button"
               data-like="${escapeHTML(c.cid)}" data-dest="${escapeHTML(c.destId)}"
               data-base="${c.likes || 0}" aria-pressed="${on}" aria-label="赞同这条留言">赞 <b>${likeCount(c)}</b></button>
+            <button class="cc__reply" type="button" data-reply="${escapeHTML(c.cid)}"
+              data-name="${escapeHTML(c.name)}" data-dest="${escapeHTML(c.destId)}">回复</button>
             <button class="cc__del" type="button" data-del="${escapeHTML(c.cid)}"
               data-dest="${escapeHTML(c.destId)}"${c.mine ? '' : ' hidden'}>删去</button>
             <button class="cc__report" type="button" data-report="${escapeHTML(c.cid)}"
               data-dest="${escapeHTML(c.destId)}" title="举报这条留言">举报</button>
           </p>
+          ${kidsHTML ? `<ul class="cc__replies">${kidsHTML}</ul>` : ''}
         </div>
       </li>`;
+  }
+
+  function cmtThreadHTML(rows) {
+    return threadOf(rows).map((t) => cmtCardHTML(t, false,
+      t.kids ? t.kids.map((k) => cmtCardHTML(k, true, '')).join('') : ''
+    )).join('');
   }
 
   function renderCmtBoard() {
@@ -850,12 +1068,22 @@
     const chipBox = $('#cmt-cities');
     if (chipBox) chipBox.innerHTML = cmtCityChipsHTML();
 
+    // @我 的未读角标
+    const atN = $('#cmt-at-n');
+    if (atN) {
+      const un = unseenMentions();
+      atN.textContent = un > 9 ? '9+' : String(un);
+      atN.hidden = un === 0;
+    }
+
+    const me = ident();
     let rows = allComments();
     if (cmtState.city !== 'all') rows = rows.filter((c) => c.destId === cmtState.city);
     if (cmtState.scope === 'mine') rows = rows.filter((c) => c.mine);
     if (cmtState.scope === 'liked') {
       rows = rows.filter((c) => (c.remote ? c.liked : likedMap[c.destId + ':' + c.cid]));
     }
+    if (cmtState.scope === 'at') rows = myMentions(rows, me);
 
     rows.sort(cmtState.sort === 'hot'
       ? (a, b) => likeCount(b) - likeCount(a) || String(b.ts).localeCompare(String(a.ts))
@@ -864,10 +1092,13 @@
     let empty = '这一处还没有人说话，来做第一个。';
     if (cmtState.scope === 'mine') empty = '你还没有留过言。左边写一句，就算来过。';
     else if (cmtState.scope === 'liked') empty = '还没有赞过哪一条。看到合意的，点一下「赞」。';
+    else if (cmtState.scope === 'at') empty = me
+      ? '还没有人 @ 你。谁在留言里写「@' + me.name + '」，就会落到这里。'
+      : '先落个籍，别人才能 @ 到你。';
     else if (cmtState.city === CM_ALL) empty = '全书留言还空着，说说这套图鉴本身。';
 
     listBox.innerHTML = rows.length
-      ? rows.map(cmtCardHTML).join('')
+      ? cmtThreadHTML(rows)
       : `<li class="cc-empty">${empty}</li>`;
   }
 
@@ -926,6 +1157,14 @@
       say('');
     });
 
+    // 点名：从在场的人里挑一个，插进正文
+    form.addEventListener('click', (e) => {
+      const atBtn = e.target.closest('[data-at]');
+      if (!atBtn) return;
+      openAtPick(atBtn, namePool(allComments()), ident(),
+        (n) => insertAtCursor(textEl, '@' + n + ' '));
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const text = textEl.value.trim();
@@ -935,19 +1174,27 @@
       if (!text) { textEl.focus(); say('还没写内容。', true); return; }
 
       const destId = cityEl.value || CM_ALL;
+      const tgt = replyTo && replyTo.from === 'board' ? replyTo : null;
+      const landId = tgt ? tgt.destId : destId;
+      const ments = mentionsIn(text, namePool(allComments()), me);
       const btn = form.querySelector('.cmt-form__send');
       btn.disabled = true;
       say(cmOnline ? '落款中…' : '');
 
       if (cmOnline) {
-        const res = await JHCloud.add(destId, text.slice(0, 140));
+        const res = await JHCloud.add(destId, text.slice(0, 140), {
+          parentId: tgt && tgt.cid, mentions: ments
+        });
         btn.disabled = false;
         if (!res.ok) { say(res.error, true); return; }
         const raw = Array.isArray(res.data) ? res.data[0] : res.data;
-        const row = remoteRow(raw || { id: Date.now(), dest_id: destId, name: me.name,
+        const row = remoteRow(raw || { id: Date.now(), dest_id: landId, name: me.name,
           school: me.school, body: text.slice(0, 140), likes: 0, created_at: new Date().toISOString() });
         row.mine = true;
         row.liked = false;
+        row.parentId = tgt ? String(tgt.cid) : null;
+        row.replyTo = tgt ? tgt.name : '';
+        row.mentions = ments;
         cmRows.unshift(row);
       } else {
         const rec = {
@@ -957,10 +1204,13 @@
           text: text.slice(0, 140),
           ts: todayStr(),
           likes: 0,
+          parentId: tgt ? String(tgt.cid) : null,
+          replyTo: tgt ? tgt.name : '',
+          mentions: ments,
         };
-        (userComments[destId] = userComments[destId] || []).push(rec);
+        (userComments[landId] = userComments[landId] || []).push(rec);
         if (!writeJSON(C_KEY, userComments)) {
-          userComments[destId].pop();
+          userComments[landId].pop();
           btn.disabled = false;
           say('留言没能存下：数据本身有问题，刷新后再试一次。', true);
           return;
@@ -970,8 +1220,9 @@
 
       textEl.value = '';
       countEl.textContent = '0';
+      clearReply();
       // 落到刚写的那一处，方便立刻看到自己这条
-      cmtState.city = destId;
+      cmtState.city = landId;
       cmtState.scope = 'all';
       syncCmtControls();
       renderCmtBoard();
@@ -991,6 +1242,8 @@
         const btn = e.target.closest('[data-scope]');
         if (!btn) return;
         cmtState.scope = btn.dataset.scope;
+        // 看到这一栏就算读过了，角标归零
+        if (cmtState.scope === 'at') markMentionsSeen();
         syncCmtControls();
         renderCmtBoard();
       });
@@ -1020,6 +1273,16 @@
       // 去处名 → 打开该处详情
       const go = e.target.closest('[data-goto-city]');
       if (go) { openDetail(go.dataset.gotoCity); return; }
+
+      // 回一句：把它接到这一条下面
+      const rbtn = e.target.closest('[data-reply]');
+      if (rbtn) {
+        startReply({
+          cid: rbtn.dataset.reply, name: rbtn.dataset.name,
+          destId: rbtn.dataset.dest, from: 'board'
+        });
+        return;
+      }
 
       // 举报：低权重入口，连点也只算一次（服务端按设备去重）
       const rep = e.target.closest('[data-report]');
@@ -1115,6 +1378,8 @@
     const d = DESTINATIONS.find((x) => x.id === id);
     if (!d) return;
     currentDetailId = id;
+    // 换一处就把回复态清掉，免得带着上一处的「回某某」发出去
+    if (replyTo) clearReply();
     // 详情里再点开另一处时，不要把「返回焦点」记到旧画轴的关闭按钮上
     if ($('#modal').hidden) lastFocused = document.activeElement;
     const color = schoolColor(d.school);

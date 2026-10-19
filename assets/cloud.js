@@ -140,12 +140,27 @@
     return call('jx3_list_comments', args);
   }
 
-  function add(dest, body) {
+  function add(dest, body, opt) {
     var id = readIdent();
     if (!id) return Promise.resolve({ ok: false, error: '先落个籍再说话。', needIdent: true });
-    return call('jx3_add_comment', {
-      p_dest: dest, p_name: id.name, p_school: id.school, p_body: body, p_key: id.key
-    });
+    var o = opt || {};
+    var args = {
+      p_dest: dest || null,
+      p_name: id.name, p_school: id.school, p_body: body, p_key: id.key
+    };
+    // 回复时去处由服务端从父留言继承，别让两边各写一个再对不上
+    if (o.parentId) { args.p_parent_id = Number(o.parentId); args.p_dest = null; }
+    if (o.mentions && o.mentions.length) args.p_mentions = o.mentions;
+    return call('jx3_add_comment', args);
+  }
+
+  // 谁在留言里 @ 了我（不含自己写的那条）
+  function mentions(since) {
+    var id = readIdent();
+    if (!id) return Promise.resolve({ ok: true, data: [] });
+    var args = { p_name: id.name, p_key: id.key };
+    if (since) args.p_since = since;
+    return call('jx3_mentions_me', args);
   }
 
   function del(commentId) {
@@ -174,6 +189,7 @@
     leave: leave,
     list: list,
     add: add,
+    mentions: mentions,
     del: del,
     like: like,
     report: report

@@ -2100,6 +2100,103 @@ body.is-locked .modal { transition: none; }
 .cm-empty { padding: 22px 0; text-align: center; font-size: 13.5px; color: var(--ink-qing); }
 .cm-note { margin: 12px 0 0; font-size: 11.5px; color: var(--ink-qing); letter-spacing: .02em; }
 
+/* ---- 楼中楼：回复条 + 楼内子留言 ----
+ * 只排一层：回「回复」也挂在同一楼里，靠「回 某某」交代对象，
+ * 不做无限缩进——窄屏上缩到第三层就没法读了。 */
+.replybar {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 10px; padding: 6px 10px;
+  background: var(--indigo-wash); border-left: 2px solid var(--indigo-soft);
+  font-size: 12px; color: var(--ink-dan); letter-spacing: .04em;
+}
+.replybar__txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.replybar__txt b { font-weight: 400; color: var(--seal); }
+.replybar__x {
+  flex: none; padding: 0 2px; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: 11.5px; color: var(--ink-qing);
+  transition: color .2s ease;
+}
+.replybar__x:hover { color: var(--seal); }
+
+.cm__replies, .cc__replies {
+  list-style: none; margin: 10px 0 0; padding: 0 0 0 12px;
+  border-left: 1px dashed var(--indigo-faint);
+  display: grid; gap: 9px;
+}
+.cm--kid { padding: 0; border-bottom: 0; grid-template-columns: 26px 1fr; gap: 9px; }
+.cm--kid .cm__ava { width: 26px; height: 26px; font-size: 12px; }
+.cm--kid .cm__name { font-size: 13px; }
+.cm--kid .cm__text { font-size: 13.5px; margin-top: 4px; }
+.cm--kid .cm__acts { margin-top: 5px; gap: 12px; }
+.cm--kid .cm__school { font-size: 10px; }
+
+.cc--kid {
+  padding: 0; border: 0; background: none; box-shadow: none;
+  grid-template-columns: 26px minmax(0, 1fr); gap: 9px;
+}
+.cc--kid:hover { box-shadow: none; transform: none; }
+.cc--kid .cc__ava { width: 26px; height: 26px; font-size: 12px; }
+.cc--kid .cc__name { font-size: 13px; }
+.cc--kid .cc__text { font-size: 13.5px; margin-top: 4px; }
+.cc--kid .cc__acts { margin-top: 5px; gap: 12px; }
+.cc--kid .cc__school { font-size: 10px; }
+
+.cm__to, .cc__to {
+  display: inline-block; margin-right: 6px; padding: 0 6px 1px;
+  font-size: 11.5px; color: var(--seal); background: var(--seal-soft);
+  border-radius: 2px; vertical-align: 1px;
+}
+.cm__mention {
+  font-weight: 400; color: var(--indigo);
+  border-bottom: 1px solid var(--indigo-faint);
+}
+
+.cm__reply, .cc__reply {
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; letter-spacing: .04em;
+  /* 比「赞」「举报」深一档：回复是新入口，得看得见 */
+  color: var(--ink-soft); transition: color .2s ease;
+}
+.cm__reply:hover, .cc__reply:hover { color: var(--indigo); }
+
+/* ---- @ 提及：按钮、选人浮层、未读角标 ---- */
+.cm-form__at, .cmt-form__at {
+  width: 24px; height: 24px; flex: none; display: grid; place-items: center;
+  border: 1px solid var(--indigo-faint); border-radius: 50%; background: transparent;
+  font-family: var(--font-serif); font-size: 13px; line-height: 1; color: var(--ink-dan);
+  cursor: pointer; transition: border-color .2s ease, color .2s ease;
+}
+.cm-form__at:hover, .cmt-form__at:hover { border-color: var(--indigo); color: var(--indigo); }
+
+.atpick {
+  position: fixed; z-index: 400; width: 168px; max-height: 236px; overflow-y: auto;
+  padding: 6px; border: 1px solid var(--indigo-soft); border-radius: 2px;
+  background-color: var(--paper-card); background-image: var(--grain);
+  box-shadow: var(--shadow);
+}
+.atpick__i {
+  display: block; width: 100%; text-align: left;
+  padding: 5px 8px; border: 0; border-radius: 2px; background: none; cursor: pointer;
+  font-family: var(--font-kai); font-size: 14px; color: var(--ink-nong); letter-spacing: .04em;
+}
+.atpick__i:hover { background: var(--indigo-wash); color: var(--indigo-deep); }
+.atpick__empty { margin: 0; padding: 8px 9px; font-size: 12px; line-height: 1.7; color: var(--ink-qing); }
+
+.cmt-chip--at { position: relative; }
+.cmt-chip__n {
+  margin-left: 5px; padding: 0 4px; border-radius: 8px;
+  background: var(--seal); color: #fdf7ef;
+  font-family: var(--font-serif); font-size: 10px; letter-spacing: 0;
+  vertical-align: 1px;
+}
+.cmt-chip--at.is-on .cmt-chip__n { background: var(--paper-panel); color: var(--seal); }
+
+.cc--atme { border-left-color: var(--seal); }
+.cc__flag {
+  padding: 0 5px 1px; border: 1px solid var(--seal); border-radius: 2px;
+  font-size: 10.5px; color: var(--seal); letter-spacing: .04em;
+}
+
 /* =========================================================================
  * 江湖客话：全站留言板
  * 左「落款」信笺（sticky）+ 右「留言流」（范围 / 排序 / 去处筛选 / 卡片）

@@ -542,7 +542,7 @@
     <div class="routes-sec">
       <header class="sec-head">
         <h3 class="sec-title">现成行程</h3>
-        <p class="sec-sub">九条线路，把二十处去处串成能照着走的日程；城与城之间标了交通与票价（二等座／普通票，约数）</p>
+        <p class="sec-sub">十条线路，把二十处去处串成能照着走的日程；城与城之间标了交通与票价（二等座／普通票，约数）</p>
       </header>
       <div class="routes-filter" id="routes-filter" role="group" aria-label="按行程天数筛选"></div>
       <div class="routes-list" id="routes-list" aria-live="polite"></div>
@@ -570,6 +570,7 @@
         </button>
         <form class="cmt-form" id="cmt-form" novalidate>
           <p class="cmt-form__head"><span>落　款</span><small>一百四十字以内</small></p>
+          <div class="replybar" data-reply-bar hidden></div>
           <label class="cmt-field">
             <span>名号</span>
             <input id="cmt-name" name="name" type="text" maxlength="10"
@@ -589,6 +590,7 @@
                       placeholder="路怎么走、什么时候去、值不值得……"></textarea>
           </label>
           <div class="cmt-form__foot">
+            <button class="cmt-form__at" type="button" data-at aria-label="提到某人">@</button>
             <span class="cmt-form__count"><b>0</b>/140</span>
             <span class="cmt-form__hint" id="cmt-hint" role="status" aria-live="polite"></span>
             <button class="cmt-form__send" type="submit">落　款</button>
@@ -605,6 +607,8 @@
             <button class="cmt-chip is-on" data-scope="all" aria-pressed="true">全部</button>
             <button class="cmt-chip" data-scope="mine" aria-pressed="false">我写的</button>
             <button class="cmt-chip" data-scope="liked" aria-pressed="false">我赞过</button>
+            <button class="cmt-chip cmt-chip--at" data-scope="at" aria-pressed="false">@我<span
+              class="cmt-chip__n" id="cmt-at-n" hidden>0</span></button>
           </div>
           <div class="cmt-sort" id="cmt-sort" role="group" aria-label="排序">
             <button class="cmt-sortbtn is-on" data-sort="new" aria-pressed="true">最新</button>
